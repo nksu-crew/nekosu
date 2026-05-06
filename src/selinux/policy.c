@@ -72,7 +72,6 @@ static const struct sepolicy_rule ksu_rules[] = {
     ALLOW(DOMAIN, "toolbox_exec",  "file", "execute"),
     ALLOW(DOMAIN, "toolbox_exec",  "file", "read"),
     ALLOW(DOMAIN, "toolbox_exec",  "file", "open"),
-    ALLOW(DOMAIN, "untrusted_app_27",        "fd",       "use"),
     ALLOW(DOMAIN, "untrusted_app_all_devpts","chr_file", "read"),
     ALLOW(DOMAIN, "untrusted_app_all_devpts","chr_file", "write"),
     ALLOW(DOMAIN, "untrusted_app_all_devpts","chr_file", "getattr"),

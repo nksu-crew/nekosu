@@ -96,7 +96,7 @@ int __init init_selinux_hook(void)
 
 	rc = sepolicy_add_domain(DOMAIN);
 	if (rc) {
-		pr_err("Failed to add domain 'nksu': %d\n", rc);
+		pr_err("Failed to add domain '%s': %d\n", DOMAIN, rc);
 		return rc;
 	}
 
