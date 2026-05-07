@@ -1,4 +1,4 @@
-# nekosu
+# NekoSU
 
 nekosu is a kernel-level rootkit.
 
