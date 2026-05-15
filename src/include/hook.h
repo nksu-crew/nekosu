@@ -1,7 +1,7 @@
 #define SU_PATH             "/system/bin/su"
 #define SU_PATH_LEN         (sizeof(SU_PATH))
 
-#define REDIRECT_TARGET     "/system/bin/sh"
+#define REDIRECT_TARGET     "/data/adb/ksud"
 #define REDIRECT_TARGET_LEN (sizeof(REDIRECT_TARGET))
 
 #define SH_PATH             "/system/bin/sh"
