@@ -1,0 +1,38 @@
+name: Sync manager
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+          token: ${{ secrets.PAT }}
+
+      - name: Sync manager
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ ! -f .gitmodules ] || ! grep -q manager .gitmodules; then
+            git submodule add https://github.com/nksu-crew/manager.git manager
+          else
+            git submodule update --remote manager
+          fi
+
+      - name: Commit and push
+        run: |
+          git add .gitmodules manager
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "chore: sync manager $(date -u +%Y-%m-%d)"
+            git push
+          fi
