@@ -1,0 +1,1 @@
+long handle_prctl_hooks(struct pt_regs *regs);

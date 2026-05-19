@@ -1,8 +1,12 @@
 #include <fmac.h>
 
-static long handle_prctl_hooks(struct pt_regs *regs)
+long handle_prctl_hooks(struct pt_regs *regs)
 {
-	unsigned long option = regs->regs[0];
+#if defined(__aarch64__)
+		unsigned long option = regs->regs[0];
+#elif defined(__x86_64__)
+		unsigned long option = regs->di;
+#endif
 
 	if (likely(!is_manager())) {
 		return 0;

@@ -14,6 +14,7 @@
 
 #include <fmac.h>
 #include "tracepoint.h"
+#include "handle.h"
 
 static unsigned long push_str(unsigned long sp, const char *str, size_t len)
 {
@@ -57,36 +58,6 @@ out:
 	rcu_read_unlock();
 }
 
-static void do_prctl(const struct pt_regs *regs)
-{
-	unsigned long option, arg2, arg3;
-#if defined(__aarch64__)
-	option = regs->regs[0];
-	arg2 = regs->regs[1];
-	arg3 = regs->regs[2];
-#elif defined(__x86_64__)
-	option = regs->di;
-	arg2 = regs->si;
-	arg3 = regs->dx;
-#endif
-	if (!is_manager())
-		return;
-
-	switch (option) {
-	case 201:
-		fmac_anonfd_get();
-		return;
-	case 202:
-		elevate_to_root();
-		return;
-	case 203:
-		fmac_ctlfd_get();
-		return;
-	default:
-		break;
-	}
-}
-
 static void probe_sys_enter(void *data, struct pt_regs *regs, long id)
 {
 	char kpath[MAX_PATH_LEN];
@@ -103,7 +74,7 @@ static void probe_sys_enter(void *data, struct pt_regs *regs, long id)
 		upath = (const char __user *)regs->regs[0];
 		break;
 	case __NR_prctl:
-		do_prctl(regs);
+		handle_prctl_hooks(regs);
 		break;
 	default:
 		upath = (const char __user *)regs->regs[1];
