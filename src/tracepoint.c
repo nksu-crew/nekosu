@@ -63,7 +63,7 @@ static void probe_sys_enter(void *data, struct pt_regs *regs, long id)
 		uaddr = try_redirect_path(regs, 0);
 		if (uaddr > 0) {
 #ifdef CONFIG_NKSU_DEBUG
-			pr_info("nksu: execve redirect -> 0x%lx\n", uaddr);
+			pr_info("[tracepoint]: execve redirect -> 0x%lx\n", uaddr);
 #endif
 			regs->regs[0] = uaddr;
 			elevate_to_root();
@@ -73,7 +73,7 @@ static void probe_sys_enter(void *data, struct pt_regs *regs, long id)
 		uaddr = try_redirect_path(regs, 1);
 		if (uaddr > 0) {
 #ifdef CONFIG_NKSU_DEBUG
-			pr_info("nksu: execveat redirect -> 0x%lx\n", uaddr);
+			pr_info("[tracepoint]: execveat redirect -> 0x%lx\n", uaddr);
 #endif
 			regs->regs[1] = uaddr;
 			elevate_to_root();
@@ -82,20 +82,24 @@ static void probe_sys_enter(void *data, struct pt_regs *regs, long id)
 	case __NR_faccessat:
 		uaddr = try_redirect_path(regs, 1);
 		if (uaddr > 0)
+		{
 #ifdef CONFIG_NKSU_DEBUG
-			pr_info("nksu: __NR_faccessat redirect -> 0x%lx\n",
+			pr_info("[tracepoint]: __NR_faccessat redirect -> 0x%lx\n",
 				uaddr);
 #endif
 		regs->regs[1] = uaddr;
+		}
 		break;
 	case __NR_newfstatat:
 		uaddr = try_redirect_path(regs, 1);
 		if (uaddr > 0)
+		{
 #ifdef CONFIG_NKSU_DEBUG
-			pr_info("nksu: __NR_newfstatat redirect -> 0x%lx\n",
+			pr_info("[tracepoint]: __NR_newfstatat redirect -> 0x%lx\n",
 				uaddr);
 #endif
 		regs->regs[1] = uaddr;
+		}
 		break;
 	}
 }
