@@ -27,5 +27,5 @@ static inline unsigned long try_redirect_path(struct pt_regs *regs,
 	if (!sp)
 		return 0;
 
-	return PUSH_STR(sp, SH_PATH, SH_PATH_LEN);
+	return PUSH_STR(sp, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
 }
