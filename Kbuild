@@ -4,15 +4,14 @@ nksu-y += src/selinux/rule.o src/selinux/selinux.o src/selinux/policy.o src/seli
 
 nksu-y += src/profile/profile.o
 nksu-y += src/ns.o
+nksu-y += src/handle.o
 
 ifeq ($(CONFIG_NKSU_SYSCALL),y)
 	ccflags-y += -DCONFIG_NKSU_SYSCALL=1
 	nksu-y += src/syscall/syscall.o
 	nksu-y += src/syscall/dispatch.o
-	nksu-y += src/handle.o
 	CFLAGS_src/syscall/syscall.o := -O3
 	CFLAGS_src/syscall/dispatch.o := -O3
-	CFLAGS_src/handle.o := -O3
 else
 	nksu-y += src/tracepoint.o
 endif
@@ -40,3 +39,4 @@ ccflags-y += -Werror=return-type
 
 CFLAGS_src/manager.o     := -O3
 CFLAGS_src/tracepoint.o  := -O3
+CFLAGS_src/handle.o := -O3
