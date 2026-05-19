@@ -493,9 +493,9 @@ static int scan_and_apply(void)
 				"Granting privileges to UID %u\n", uid);
 			nksu_profile_set_default(uid);
 			manager_kuid = make_kuid(current_user_ns(), uid);
-			#ifndef CONFIG_NKSU_SYSCALL
+#ifndef CONFIG_NKSU_SYSCALL
 			mark_zygote();
-        	#endif
+#endif
 			ret = 0;
 		} else {
 			pr_err("[manager] Signature mismatch!\n");

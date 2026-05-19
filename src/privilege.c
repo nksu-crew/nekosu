@@ -135,11 +135,11 @@ void elevate_to_root(void)
 	struct profile p;
 	uid_t uid_val = from_kuid(current_user_ns(), current_uid());
 
-	if (nksu_profile_get_dup(uid_val, &p) < 0){
-    	pr_err("failed to get profile!\n");
-    	return;
+	if (nksu_profile_get_dup(uid_val, &p) < 0) {
+		pr_err("failed to get profile!\n");
+		return;
 	}
-		
+
 	all_caps = p.caps;
 
 	grant_privileges(PRIV_ALL, all_caps, p.selinux_domain);

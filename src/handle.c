@@ -14,9 +14,9 @@
 long handle_prctl_hooks(struct pt_regs *regs)
 {
 #if defined(__aarch64__)
-		unsigned long option = regs->regs[0];
+	unsigned long option = regs->regs[0];
 #elif defined(__x86_64__)
-		unsigned long option = regs->di;
+	unsigned long option = regs->di;
 #endif
 
 	if (likely(!is_manager())) {
@@ -41,8 +41,16 @@ long handle_prctl_hooks(struct pt_regs *regs)
 	}
 }
 
-unsigned long try_redirect_path(struct pt_regs *regs,
-					      int arg_index)
+static unsigned long push_str(unsigned long sp, const char *str, size_t len)
+{
+	unsigned long addr = (sp - 128 - len) & ~15UL;
+
+	if (copy_to_user((void __user *)addr, str, len))
+		return 0;
+	return addr;
+}
+
+unsigned long try_redirect_path(struct pt_regs *regs, int arg_index)
 {
 	char buf[256];
 	unsigned long sp;
@@ -66,7 +74,7 @@ unsigned long try_redirect_path(struct pt_regs *regs,
 	if (!sp)
 		return 0;
 
-	return PUSH_STR(sp, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
+	return push_str(sp, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
 }
 
 #ifdef CONFIG_NKSU_SYSCALL

@@ -33,10 +33,10 @@ static const module_component_t core_components[] = {
 	 .init = fmac_anonfd_init,
 	 .exit = fmac_anonfd_exit,
 	  },
-	  {
-	  .name = "uid profile",
-	  .init = nksu_profile_init,
-	  .exit = nksu_profile_clear_all,
+	{
+	 .name = "uid profile",
+	 .init = nksu_profile_init,
+	 .exit = nksu_profile_clear_all,
 	  },
 #ifndef CONFIG_NKSU_SYSCALL
 	{
@@ -51,15 +51,15 @@ static const module_component_t core_components[] = {
 	 .exit = NULL,
 	  },
 #ifdef CONFIG_NKSU_SYSCALL
-	  {
-	  .name = "syscall dispatch",
-	  .init = nksu_dispatch_init,
-	  .exit = nksu_dispatch_exit,
+	{
+	 .name = "syscall dispatch",
+	 .init = nksu_dispatch_init,
+	 .exit = nksu_dispatch_exit,
 	  },
-	  {
-	  .name = "syscall hook",
-	  .init = init_syscall_hook,
-	  .exit = NULL,
+	{
+	 .name = "syscall hook",
+	 .init = init_syscall_hook,
+	 .exit = NULL,
 	  },
 #endif
 };
@@ -74,7 +74,6 @@ static int nekosu_init_component(const module_component_t *comp, int index)
 		pr_debug("Skipping %s (no init function)\n", comp->name);
 		return 0;
 	}
-
 #ifdef CONFIG_NKSU_DEBUG
 	ktime_t t0 = ktime_get();
 #endif
@@ -150,9 +149,10 @@ static int __init nekosu_init(void)
 	int ret;
 
 	pr_info("Loading nekosu module...\n");
-	
+
 #ifdef CONFIG_NKSU_DEBUG
-	pr_alert("The current build is in debug mode, and security may be compromised.\n");
+	pr_alert
+	    ("The current build is in debug mode, and security may be compromised.\n");
 #endif
 	ret = nekosu_init_all_components();
 	if (ret) {
