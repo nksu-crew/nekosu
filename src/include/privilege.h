@@ -1,3 +1,5 @@
+#include <linux/capability.h>
+
 #ifndef PRIVILEGE_H
 #define PRIVILEGE_H
 

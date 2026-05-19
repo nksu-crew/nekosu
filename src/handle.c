@@ -9,6 +9,7 @@
 #include "manager.h"
 #include "anonfd.h"
 #include "privilege.h"
+#include "ioctl.h"
 
 long handle_prctl_hooks(struct pt_regs *regs)
 {
