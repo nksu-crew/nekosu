@@ -1,216 +1,185 @@
 // SPDX-License-Identifier: GPL-3.0
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/uaccess.h>
-#include <linux/string.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/spinlock.h>
-#include <linux/tracepoint.h>
-#include <linux/trace_events.h>
 #include <asm/syscall.h>
+#include <linux/kernel.h>
+#include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/pid.h>
+#include <linux/sched.h>
 #include <linux/sched/signal.h>
+#include <linux/spinlock.h>
+#include <linux/string.h>
+#include <linux/trace_events.h>
+#include <linux/tracepoint.h>
+#include <linux/uaccess.h>
 
-#include <fmac.h>
-#include "tracepoint.h"
 #include "handle.h"
-
-static unsigned long push_str(unsigned long sp, const char *str, size_t len)
-{
-	unsigned long addr = (sp - 128 - len) & ~15UL;
-
-	if (copy_to_user((void __user *)addr, str, len))
-		return 0;
-	return addr;
-}
+#include "tracepoint.h"
+#include <fmac.h>
 
 static struct tracepoint *tp_sys_enter;
 static struct tracepoint *tp_sys_exit;
 
-void mark_threads_by_uid(uid_t uid)
-{
-	struct task_struct *g, *p;
-	rcu_read_lock();
-	for_each_process_thread(g, p) {
-		if (__kuid_val(task_uid(p)) == uid)
-			set_tsk_thread_flag(p, TIF_SYSCALL_TRACEPOINT);
-	}
-	rcu_read_unlock();
+void mark_threads_by_uid(uid_t uid) {
+  struct task_struct *g, *p;
+  rcu_read_lock();
+  for_each_process_thread(g, p) {
+    if (__kuid_val(task_uid(p)) == uid)
+      set_tsk_thread_flag(p, TIF_SYSCALL_TRACEPOINT);
+  }
+  rcu_read_unlock();
 }
 
-void mark_threads_by_pid(pid_t pid)
-{
-	struct task_struct *task, *t;
+void mark_threads_by_pid(pid_t pid) {
+  struct task_struct *task, *t;
 
-	rcu_read_lock();
+  rcu_read_lock();
 
-	task = find_task_by_vpid(pid);
-	if (!task)
-		goto out;
+  task = find_task_by_vpid(pid);
+  if (!task)
+    goto out;
 
-	for_each_thread(task, t)
-	    set_tsk_thread_flag(t, TIF_SYSCALL_TRACEPOINT);
+  for_each_thread(task, t) set_tsk_thread_flag(t, TIF_SYSCALL_TRACEPOINT);
 
-	set_tsk_thread_flag(task, TIF_SYSCALL_TRACEPOINT);
+  set_tsk_thread_flag(task, TIF_SYSCALL_TRACEPOINT);
 
 out:
-	rcu_read_unlock();
+  rcu_read_unlock();
 }
 
-static void probe_sys_enter(void *data, struct pt_regs *regs, long id)
-{
-	char kpath[MAX_PATH_LEN];
-	unsigned long uaddr;
-	unsigned long sp;
-	uid_t target_uid;
-	const char __user *upath = NULL;
+static void probe_sys_enter(void *data, struct pt_regs *regs, long id) {
+  char kpath[MAX_PATH_LEN];
+  unsigned long uaddr;
+  uid_t target_uid;
+  const char __user *upath = NULL;
 
-	if (!nksu_profile_has_uid(__kuid_val(task_uid(current))))
-		return;
+  if (!nksu_profile_has_uid(__kuid_val(task_uid(current))))
+    return;
 
-	switch (id) {
-	case __NR_execve:
-		upath = (const char __user *)regs->regs[0];
-		break;
-	case __NR_prctl:
-		handle_prctl_hooks(regs);
-		break;
-	default:
-		upath = (const char __user *)regs->regs[1];
-		break;
-	}
+  switch (id) {
+  case __NR_execve:
+    upath = (const char __user *)regs->regs[0];
+    break;
+  case __NR_prctl:
+    handle_prctl_hooks(regs);
+    break;
+  default:
+    upath = (const char __user *)regs->regs[1];
+    break;
+  }
 
-	if (!upath)
-		return;
-	if (strncpy_from_user(kpath, upath, sizeof(kpath)) < 0)
-		return;
-	kpath[sizeof(kpath) - 1] = '\0';
+  if (!upath)
+    return;
+  if (strncpy_from_user(kpath, upath, sizeof(kpath)) < 0)
+    return;
+  kpath[sizeof(kpath) - 1] = '\0';
 
-	if (!path_is_su(kpath))
-		return;
+  if (!path_is_su(kpath))
+    return;
 
-	sp = current->mm ? user_stack_pointer(regs) : 0;
-	if (!sp)
-		return;
+  switch (id) {
+  case __NR_execve:
+    uaddr = try_redirect_path(regs, 0);
+    if (uaddr > 0) {
+      regs->regs[0] = uaddr;
+      elevate_to_root();
+    }
+    break;
 
-	switch (id) {
-	case __NR_execve:
-		uaddr = push_str(sp, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
-		if (!uaddr)
-			return;
-		pr_info("execve %s -> " REDIRECT_TARGET "\n", kpath);
-		regs->regs[0] = uaddr;
-		elevate_to_root();
-		break;
+  case __NR_execveat:
+    uaddr = try_redirect_path(regs, 1);
+    if (uaddr > 0) {
+      regs->regs[1] = uaddr;
+      elevate_to_root();
+    }
+    break;
 
-	case __NR_execveat:
-		uaddr = push_str(sp, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
-		if (!uaddr)
-			return;
-		pr_info("execveat %s -> " REDIRECT_TARGET "\n", kpath);
-		regs->regs[1] = uaddr;
-		elevate_to_root();
-		break;
+  case __NR_faccessat:
+    uaddr = try_redirect_path(regs, 1);
+    if (uaddr > 0) {
+      regs->regs[1] = uaddr;
+    }
+    break;
 
-	case __NR_faccessat:
-		uaddr = push_str(sp, SH_PATH, SH_PATH_LEN);
-		if (!uaddr)
-			return;
-		pr_info("faccessat %s -> " SH_PATH "\n", kpath);
-		regs->regs[1] = uaddr;
-		break;
-
-	case __NR_newfstatat:
-		uaddr = push_str(sp, SH_PATH, SH_PATH_LEN);
-		if (!uaddr)
-			return;
-		pr_info("newfstatat %s -> " SH_PATH "\n", kpath);
-		regs->regs[1] = uaddr;
-		break;
-	}
+  case __NR_newfstatat:
+    uaddr = try_redirect_path(regs, 1);
+    if (uaddr > 0) {
+      regs->regs[1] = uaddr;
+    }
+    break;
+  }
 }
 
 struct tp_find_ctx {
-	const char *name;
-	struct tracepoint **out;
+  const char *name;
+  struct tracepoint **out;
 };
 
-static void tp_find_cb(struct tracepoint *tp, void *priv)
-{
-	struct tp_find_ctx *ctx = priv;
+static void tp_find_cb(struct tracepoint *tp, void *priv) {
+  struct tp_find_ctx *ctx = priv;
 
-	if (*ctx->out)
-		return;
-	if (strcmp(tp->name, ctx->name) == 0)
-		*ctx->out = tp;
+  if (*ctx->out)
+    return;
+  if (strcmp(tp->name, ctx->name) == 0)
+    *ctx->out = tp;
 }
 
-static struct tracepoint *find_tracepoint(const char *name)
-{
-	struct tracepoint *result = NULL;
-	struct tp_find_ctx ctx = {.name = name,.out = &result };
+static struct tracepoint *find_tracepoint(const char *name) {
+  struct tracepoint *result = NULL;
+  struct tp_find_ctx ctx = {.name = name, .out = &result};
 
-	for_each_kernel_tracepoint(tp_find_cb, &ctx);
-	return result;
+  for_each_kernel_tracepoint(tp_find_cb, &ctx);
+  return result;
 }
 
 static struct tracepoint *tp_sched_fork;
 
-static void probe_sched_fork(void *data,
-			     struct task_struct *parent,
-			     struct task_struct *child)
-{
-	if (!nksu_profile_has_uid(__kuid_val(task_uid(child))))
-		return;
+static void probe_sched_fork(void *data, struct task_struct *parent,
+                             struct task_struct *child) {
+  if (!nksu_profile_has_uid(__kuid_val(task_uid(child))))
+    return;
 
-	mark_threads_by_uid(__kuid_val(task_uid(child)));
+  mark_threads_by_uid(__kuid_val(task_uid(child)));
 }
 
-int load_tracepoint_hook(void)
-{
-	int ret;
+int load_tracepoint_hook(void) {
+  int ret;
 
-	tp_sys_enter = find_tracepoint("sys_enter");
-	if (!tp_sys_enter) {
-		pr_err("cannot find sys_enter tracepoint\n");
-		return -ENOENT;
-	}
+  tp_sys_enter = find_tracepoint("sys_enter");
+  if (!tp_sys_enter) {
+    pr_err("cannot find sys_enter tracepoint\n");
+    return -ENOENT;
+  }
 
-	tp_sched_fork = find_tracepoint("sched_process_fork");
-	if (!tp_sched_fork) {
-		pr_err("cannot find sched_process_fork tracepoint\n");
-		return -ENOENT;
-	}
+  tp_sched_fork = find_tracepoint("sched_process_fork");
+  if (!tp_sched_fork) {
+    pr_err("cannot find sched_process_fork tracepoint\n");
+    return -ENOENT;
+  }
 
-	ret = tracepoint_probe_register(tp_sys_enter, probe_sys_enter, NULL);
-	if (ret) {
-		pr_err("register sys_enter probe failed: %d\n", ret);
-		return ret;
-	}
+  ret = tracepoint_probe_register(tp_sys_enter, probe_sys_enter, NULL);
+  if (ret) {
+    pr_err("register sys_enter probe failed: %d\n", ret);
+    return ret;
+  }
 
-	ret = tracepoint_probe_register(tp_sched_fork, probe_sched_fork, NULL);
-	if (ret) {
-		pr_err("register sched_process_fork probe failed: %d\n", ret);
-		tracepoint_probe_unregister(tp_sys_enter, probe_sys_enter,
-					    NULL);
-		return ret;
-	}
+  ret = tracepoint_probe_register(tp_sched_fork, probe_sched_fork, NULL);
+  if (ret) {
+    pr_err("register sched_process_fork probe failed: %d\n", ret);
+    tracepoint_probe_unregister(tp_sys_enter, probe_sys_enter, NULL);
+    return ret;
+  }
 
-	pr_info("tracepoint hooks loaded (tracepoint)\n");
-	return 0;
+  pr_info("tracepoint hooks loaded (tracepoint)\n");
+  return 0;
 }
 
-void unload_tracepoint_hook(void)
-{
-	if (tp_sys_enter)
-		tracepoint_probe_unregister(tp_sys_enter, probe_sys_enter,
-					    NULL);
-	if (tp_sched_fork)
-		tracepoint_probe_unregister(tp_sched_fork, probe_sched_fork,
-					    NULL);
+void unload_tracepoint_hook(void) {
+  if (tp_sys_enter)
+    tracepoint_probe_unregister(tp_sys_enter, probe_sys_enter, NULL);
+  if (tp_sched_fork)
+    tracepoint_probe_unregister(tp_sched_fork, probe_sched_fork, NULL);
 
-	tracepoint_synchronize_unregister();
+  tracepoint_synchronize_unregister();
 
-	pr_info("tracepoint hooks unloaded\n");
+  pr_info("tracepoint hooks unloaded\n");
 }

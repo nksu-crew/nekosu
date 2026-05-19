@@ -1,4 +1,4 @@
-#include <fmac.h>
+#include "hook.h"
 
 long handle_prctl_hooks(struct pt_regs *regs)
 {
@@ -57,6 +57,8 @@ static inline unsigned long try_redirect_path(struct pt_regs *regs,
 
 	return PUSH_STR(sp, SH_PATH, SH_PATH_LEN);
 }
+
+#ifdef CONFIG_NKSU_SYSCALL
 
 static long hook_path_at(struct pt_regs *regs)
 {
@@ -161,3 +163,4 @@ int init_syscall_hook(void)
 	pr_info("[hook]: loaded syscall hook\n");
 	return 0;
 }
+#endif
