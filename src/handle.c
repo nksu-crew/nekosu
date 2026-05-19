@@ -44,7 +44,7 @@ long handle_prctl_hooks(struct pt_regs *regs)
 unsigned long try_redirect_path(struct pt_regs *regs,
 					      int arg_index)
 {
-	char buf[MAX_PATH_LEN];
+	char buf[256];
 	unsigned long sp;
 	const char __user *upath;
 
