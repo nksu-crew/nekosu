@@ -1,4 +1,14 @@
+#include <linux/string.h>
+#include <linux/kernel.h>
+#include <linux/sched.h>
+#include <linux/uaccess.h>
+#include <asm/ptrace.h>
+#include <linux/compiler.h>
+
 #include "hook.h"
+#include "manager.h"
+#include "anonfd.h"
+#include "privilege.h"
 
 long handle_prctl_hooks(struct pt_regs *regs)
 {
