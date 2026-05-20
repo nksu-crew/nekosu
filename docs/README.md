@@ -56,7 +56,7 @@ For full details, see the [LICENSE](./LICENSE) file.
 
 <div align="center">
 
-**Made with precision by FMAC Team**
+**Made with precision by NekoSU Crew**
 
 [GitHub](https://github.com/FMAC-Team/nekosu) • [Issues](https://github.com/FMAC-Team/nekosu/issues) • [License](./LICENSE)
 
