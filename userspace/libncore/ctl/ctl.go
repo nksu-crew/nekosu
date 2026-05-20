@@ -12,47 +12,7 @@ import (
 )
 
 /*
-#include <stdint.h>
-struct nksu_profile_data {
-    unsigned int uid;
-    uint64_t caps;
-    char selinux_domain[64];
-    int namespace;
-};
-
-struct fmac_sepolicy_rule {
-    char src[64];
-    char tgt[64];
-    char cls[64];
-    char perm[64];
-    int effect;
-    int invert;
-};
-
-struct fmac_uid_cap {
-    unsigned int uid;
-    uint64_t caps;
-};
-
-#include <linux/ioctl.h>
-
-#define FMAC_MAGIC 'F'
-
-#define IOC_GET_SHM      _IO(FMAC_MAGIC, 0)
-#define IOC_BIND_EVT     _IOW(FMAC_MAGIC, 1, int)
-#define IOC_CHK_WRITE    _IOR(FMAC_MAGIC, 2, int)
-#define IOC_ADD_UID      _IOW(FMAC_MAGIC, 3, int)
-#define IOC_DEL_UID      _IOW(FMAC_MAGIC, 4, int)
-#define IOC_HAS_UID      _IOWR(FMAC_MAGIC, 5, int)
-
-#define IOC_SET_CAP  _IOW(FMAC_MAGIC, 6, struct fmac_uid_cap)
-#define IOC_GET_CAP  _IOWR(FMAC_MAGIC, 7, struct fmac_uid_cap)
-#define IOC_DEL_CAP  _IOW(FMAC_MAGIC, 8, struct fmac_uid_cap)
-
-#define IOC_SEL_ADD_RULE _IOW(FMAC_MAGIC, 9, struct fmac_sepolicy_rule)
-
-#define IOC_SET_PROFILE _IOW(FMAC_MAGIC, 10, struct nksu_profile_data)
-
+#include "ioctl.h"
 */
 import "C"
 
@@ -80,11 +40,22 @@ var (
 	IOC_SET_PROFILE  = uint32(C.IOC_SET_PROFILE)
 )
 
-func ioctl(fd int, cmd uint32, arg uintptr) error {
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(cmd), arg)
-	if errno != 0 {
-		return fmt.Errorf("ioctl errno=%d", errno)
+func ioctl(
+	fd int,
+	cmd uint32,
+	arg unsafe.Pointer,
+) error {
+
+	r := C.bioctl(
+		C.int(fd),
+		C.ulong(cmd),
+		arg,
+	)
+
+	if r < 0 {
+		return fmt.Errorf("ioctl failed")
 	}
+
 	return nil
 }
 
@@ -127,7 +98,7 @@ func SetProfile(fd int, uid int, caps uint64, domain string, namespace int) erro
 	copyToCChar64(&data.selinux_domain, domain)
 	data.namespace = C.int(int32(namespace))
 
-	return ioctl(fd, IOC_SET_PROFILE, uintptr(unsafe.Pointer(&data)))
+	return ioctl(fd, IOC_SET_PROFILE, unsafe.Pointer(&data))
 }
 
 func AddUid(fd int, uid int) error {
@@ -135,7 +106,7 @@ func AddUid(fd int, uid int) error {
 		return fmt.Errorf("invalid uid")
 	}
 	val := uint32(uid)
-	return ioctl(fd, IOC_ADD_UID, uintptr(unsafe.Pointer(&val)))
+	return ioctl(fd, IOC_ADD_UID, unsafe.Pointer(&val))
 }
 
 func DelUid(fd int, uid int) error {
@@ -143,7 +114,7 @@ func DelUid(fd int, uid int) error {
 		return fmt.Errorf("invalid uid")
 	}
 	val := uint32(uid)
-	return ioctl(fd, IOC_DEL_UID, uintptr(unsafe.Pointer(&val)))
+	return ioctl(fd, IOC_DEL_UID, unsafe.Pointer(&val))
 }
 
 func HasUid(fd int, uid int) (bool, error) {
@@ -151,7 +122,7 @@ func HasUid(fd int, uid int) (bool, error) {
 		return false, fmt.Errorf("invalid uid")
 	}
 	val := uint32(uid)
-	if err := ioctl(fd, IOC_HAS_UID, uintptr(unsafe.Pointer(&val))); err != nil {
+	if err := ioctl(fd, IOC_HAS_UID, unsafe.Pointer(&val)); err != nil {
 		return false, err
 	}
 	return val != 0, nil
@@ -161,13 +132,13 @@ func SetCap(fd int, uid int, caps uint64) error {
 	var uc C.struct_fmac_uid_cap
 	uc.uid = C.uint(uid)
 	uc.caps = C.uint64_t(caps)
-	return ioctl(fd, IOC_SET_CAP, uintptr(unsafe.Pointer(&uc)))
+	return ioctl(fd, IOC_SET_CAP, unsafe.Pointer(&uc))
 }
 
 func GetCap(fd int, uid int) (uint64, error) {
 	var uc C.struct_fmac_uid_cap
 	uc.uid = C.uint(uid)
-	if err := ioctl(fd, IOC_GET_CAP, uintptr(unsafe.Pointer(&uc))); err != nil {
+	if err := ioctl(fd, IOC_GET_CAP, unsafe.Pointer(&uc)); err != nil {
 		return 0, err
 	}
 	return uint64(uc.caps), nil
@@ -176,7 +147,7 @@ func GetCap(fd int, uid int) (uint64, error) {
 func DelCap(fd int, uid int) error {
 	var uc C.struct_fmac_uid_cap
 	uc.uid = C.uint(uid)
-	return ioctl(fd, IOC_DEL_CAP, uintptr(unsafe.Pointer(&uc)))
+	return ioctl(fd, IOC_DEL_CAP, unsafe.Pointer(&uc))
 }
 
 func AddSelinuxRule(fd int, src, tgt, cls, perm string, effect int, invert bool) error {
@@ -193,7 +164,7 @@ func AddSelinuxRule(fd int, src, tgt, cls, perm string, effect int, invert bool)
 	} else {
 		r.invert = 0
 	}
-	return ioctl(fd, IOC_SEL_ADD_RULE, uintptr(unsafe.Pointer(&r)))
+	return ioctl(fd, IOC_SEL_ADD_RULE, unsafe.Pointer(&r))
 }
 
 func ScanDriverFd() (int, error) {
