@@ -12,17 +12,6 @@ Direct, kernel-enforced root privilege escalation with fine-grained control over
 
 ---
 
-## 📋 Technical Highlights
-
-| Feature | Description |
-|---------|-------------|
-| **Kernel Integration** | Direct GKI kernel module integration (android13-5.15 through android16-6.12) |
-| **Architecture** | Supports ARM64 with clean separation: kernel module (C), native library (Golang/JNI), Android app (Kotlin/Jetpack Compose) |
-| **Policy Injection** | Runtime SELinux policy modification and dynamic capability management |
-| **Process Control** | Fine-grained per-UID privilege profiles with RCU-protected caching |
-
----
-
 ## 🚀 Getting Started
 
 ### Prerequisites
