@@ -41,54 +41,77 @@ long handle_prctl_hooks(struct pt_regs *regs)
 	}
 }
 
-static unsigned long push_str(unsigned long sp, const char *str, size_t len)
+static unsigned long __always_inline
+push_str(unsigned long sp, const char *str, size_t len)
 {
-	unsigned long addr = (sp - 128 - len) & ~15UL;
+	unsigned long addr;
 
-	if (copy_to_user((void __user *)addr, str, len))
+	if (unlikely(!len || len > PAGE_SIZE))
 		return 0;
+
+	addr = (sp - 128UL - len) & ~15UL;
+
+	if (unlikely(addr >= sp || !access_ok((void __user *)addr, len)))
+		return 0;
+
+	if (unlikely(copy_to_user((void __user *)addr, str, len)))
+		return 0;
+
 	return addr;
 }
 
-static unsigned long try_redirect_path(struct pt_regs *regs, int arg_index)
+static unsigned long
+try_redirect_path(struct pt_regs *regs, unsigned int arg_index,
+		  const char *target, size_t target_len)
 {
 	char buf[256];
-	unsigned long sp;
 	const char __user *upath;
+	unsigned long sp;
+	ssize_t ulen;
 
-	if (!current->mm)
+	if (unlikely(!current->mm))
+		return 0;
+
+	if (unlikely(arg_index > 7))
+		return 0;
+
+	if (unlikely(!target || !target_len || target_len > PAGE_SIZE))
 		return 0;
 
 	upath = (const char __user *)regs->regs[arg_index];
-	if (!upath)
+	if (unlikely(!upath))
 		return 0;
 
-	if (strncpy_from_user(buf, upath, sizeof(buf)) < 0)
+	ulen = strncpy_from_user(buf, upath, sizeof(buf));
+	if (unlikely(ulen <= 0))
 		return 0;
 
 	buf[sizeof(buf) - 1] = '\0';
+
 	if (!path_is_su(buf))
 		return 0;
 
 	sp = user_stack_pointer(regs);
-	if (!sp)
+	if (unlikely(!sp))
 		return 0;
 
-	return push_str(sp, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
+	return push_str(sp, target, target_len);
 }
 
- long hook_path_at(struct pt_regs *regs)
+long hook_path_at(struct pt_regs *regs)
 {
-	unsigned long new_uaddr = try_redirect_path(regs, 1);
+	unsigned long new_uaddr =
+	    try_redirect_path(regs, 1, SH_PATH, SH_PATH_LEN);
 	if (new_uaddr > 0) {
 		regs->regs[1] = new_uaddr;
 	}
 	return 0;
 }
 
- long hook__NR_execve(struct pt_regs *regs)
+long hook__NR_execve(struct pt_regs *regs)
 {
-	unsigned long new_uaddr = try_redirect_path(regs, 0);
+	unsigned long new_uaddr =
+	    try_redirect_path(regs, 0, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
 	if (new_uaddr > 0) {
 		regs->regs[0] = new_uaddr;
 		elevate_to_root();
@@ -96,9 +119,10 @@ static unsigned long try_redirect_path(struct pt_regs *regs, int arg_index)
 	return 0;
 }
 
- long hook__NR_execveat(struct pt_regs *regs)
+long hook__NR_execveat(struct pt_regs *regs)
 {
-	unsigned long new_uaddr = try_redirect_path(regs, 1);
+	unsigned long new_uaddr =
+	    try_redirect_path(regs, 1, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
 	if (new_uaddr > 0) {
 		regs->regs[1] = new_uaddr;
 		elevate_to_root();
