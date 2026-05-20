@@ -1,9 +1,7 @@
 package main
 
 /*
-#cgo LDFLAGS: -llog
 #include <jni.h>
-#include <android/log.h>
 #include <fcntl.h>
 #include <time.h>
 #include <sys/uio.h>
@@ -23,44 +21,18 @@ static void bridge_ReleaseStringUTFChars(JNIEnv *env, jstring s, const char *p) 
     if (s == NULL || p == NULL) return;
     (*env)->ReleaseStringUTFChars(env, s, p);
 }
-
-static void bridge_log(int priority, const char *tag, const char *msg) {
-    __android_log_print(priority, tag, "%s", msg);
-}
 */
 import "C"
 import (
-	"fmt"
-	"os"
 	"unsafe"
 
 	"nekosu/libncore/ctl"
+	"nekosu/libncore/log"
 )
-
-const logTag = "ncore"
-
-type logPriority = C.int
-
-const (
-	logDEBUG logPriority = C.ANDROID_LOG_DEBUG
-	logINFO  logPriority = C.ANDROID_LOG_INFO
-	logWARN  logPriority = C.ANDROID_LOG_WARN
-	logERROR logPriority = C.ANDROID_LOG_ERROR
-)
-
-func logf(priority logPriority, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	cs := C.CString(msg)
-	tag := C.CString(logTag)
-	defer C.free(unsafe.Pointer(cs))
-	defer C.free(unsafe.Pointer(tag))
-	C.bridge_log(priority, tag, cs)
-}
 
 var (
-	fd      C.int = -1
-	ctlfd   C.int = -1
-	logFile *os.File
+	fd    C.int = -1
+	ctlfd C.int = -1
 )
 
 //export JNI_OnLoad
@@ -69,7 +41,7 @@ func JNI_OnLoad(vm *C.JavaVM, reserved unsafe.Pointer) C.jint {
 	_ = vm
 
 	if err := ctl.Ctl(ctl.OpcodeAuthenticate); err != nil {
-		logf(logERROR, "ctl error: %s", err.Error())
+		log.Err("ctl error: %s", err.Error())
 	}
 
 	return C.JNI_VERSION_1_6
@@ -93,13 +65,13 @@ func Java_me_nekosu_aqnya_ncore_ctl(env *C.JNIEnv, thiz C.jobject, value C.jint)
 	}
 
 	if err := ctl.Ctl(op); err != nil {
-		logf(logERROR, "ctl error: %s", err.Error())
+		log.Err("ctl error: %s", err.Error())
 	}
 
 	if value == 1 {
 		f, err := ctl.ScanDriverFd()
 		if err != nil {
-			logf(logINFO, "fail to scan fd: %s", err.Error())
+			log.Err("fail to scan fd: %s", err.Error())
 		} else {
 			fd = C.int(f)
 		}
@@ -107,14 +79,14 @@ func Java_me_nekosu_aqnya_ncore_ctl(env *C.JNIEnv, thiz C.jobject, value C.jint)
 	if value == 3 {
 		f, err := ctl.ScanCtlFd()
 		if err != nil {
-			logf(logINFO, "fail to scan ctlfd: %s", err.Error())
+			log.Err("fail to scan ctlfd: %s", err.Error())
 		} else {
 			ctlfd = C.int(f)
 		}
-		logf(logINFO, "ctlfd after scan: %d", ctlfd)
+		log.Info("ctlfd after scan: %d", ctlfd)
 	}
 
-	logf(logINFO, "ctl fd: %d", fd)
+	log.Info("ctl fd: %d", fd)
 	if fd < 0 {
 		return -1
 	}
@@ -146,7 +118,7 @@ func Java_me_nekosu_aqnya_ncore_setProfile(
 	)
 
 	if err != nil {
-		logf(logERROR, "setProfile failed: %s", err.Error())
+		log.Err("setProfile failed: %s", err.Error())
 		return -1
 	}
 
@@ -158,7 +130,7 @@ func Java_me_nekosu_aqnya_ncore_adduid(env *C.JNIEnv, thiz C.jobject, value C.ji
 	_ = thiz
 	_ = env
 	if err := ctl.AddUid(int(ctlfd), int(value)); err != nil {
-		logf(logINFO, "adduid failed: %s", err.Error())
+		log.Err("adduid failed: %s", err.Error())
 		return -1
 	}
 	return 0
@@ -169,7 +141,7 @@ func Java_me_nekosu_aqnya_ncore_deluid(env *C.JNIEnv, thiz C.jobject, value C.ji
 	_ = thiz
 	_ = env
 	if err := ctl.DelUid(int(ctlfd), int(value)); err != nil {
-		logf(logINFO, "deluid failed: %s", err.Error())
+		log.Err("deluid failed: %s", err.Error())
 		return -1
 	}
 	return 0
@@ -197,7 +169,7 @@ func Java_me_nekosu_aqnya_ncore_setCap(env *C.JNIEnv, thiz C.jobject, uid C.jint
 		return -1
 	}
 	if err := ctl.SetCap(int(ctlfd), int(uid), uint64(caps)); err != nil {
-		logf(logINFO, "setCap failed: %s", err.Error())
+		log.Err("setCap failed: %s", err.Error())
 		return -1
 	}
 	return 0
@@ -212,7 +184,7 @@ func Java_me_nekosu_aqnya_ncore_getCap(env *C.JNIEnv, thiz C.jobject, uid C.jint
 	}
 	caps, err := ctl.GetCap(int(ctlfd), int(uid))
 	if err != nil {
-		logf(logINFO, "getCap failed: %s", err.Error())
+		log.Err("getCap failed: %s", err.Error())
 		return -1
 	}
 	return C.jlong(caps)
@@ -226,7 +198,7 @@ func Java_me_nekosu_aqnya_ncore_delCap(env *C.JNIEnv, thiz C.jobject, uid C.jint
 		return -1
 	}
 	if err := ctl.DelCap(int(ctlfd), int(uid)); err != nil {
-		logf(logINFO, "delCap failed: %s", err.Error())
+		log.Err("delCap failed: %s", err.Error())
 		return -1
 	}
 	return 0
@@ -268,7 +240,7 @@ func Java_me_nekosu_aqnya_ncore_addSelinuxRule(
 		goStr(srcP), goStr(tgtP), goStr(clsP), goStr(permP),
 		int(effect), invert != 0,
 	); err != nil {
-		logf(logINFO, "addSelinuxRule failed: %s", err.Error())
+		log.Err("addSelinuxRule failed: %s", err.Error())
 		return -1
 	}
 	return 0
@@ -295,8 +267,8 @@ func Java_me_nekosu_aqnya_ncore_delRule(env *C.JNIEnv, thiz C.jobject, pathStr C
 func Java_me_nekosu_aqnya_ncore_helloLog(env *C.JNIEnv, thiz C.jobject) {
 	_ = thiz
 	_ = env
-	logf(logDEBUG, "Hello, this is a log from Go!")
-	logf(logINFO, "ncore build-as lib")
+	log.Debug("Hello, this is a log from Go!")
+	log.Info("ncore build-as lib")
 }
 
 func main() {
