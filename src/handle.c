@@ -50,7 +50,7 @@ static unsigned long push_str(unsigned long sp, const char *str, size_t len)
 	return addr;
 }
 
-unsigned long try_redirect_path(struct pt_regs *regs, int arg_index)
+static unsigned long try_redirect_path(struct pt_regs *regs, int arg_index)
 {
 	char buf[256];
 	unsigned long sp;
@@ -77,12 +77,8 @@ unsigned long try_redirect_path(struct pt_regs *regs, int arg_index)
 	return push_str(sp, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
 }
 
-#ifdef CONFIG_NKSU_SYSCALL
-
-static long hook_path_at(struct pt_regs *regs)
+ long hook_path_at(struct pt_regs *regs)
 {
-	if (!nksu_profile_has_uid(current_uid().val))
-		return 0;
 	unsigned long new_uaddr = try_redirect_path(regs, 1);
 	if (new_uaddr > 0) {
 		regs->regs[1] = new_uaddr;
@@ -90,11 +86,8 @@ static long hook_path_at(struct pt_regs *regs)
 	return 0;
 }
 
-static long hook__NR_execve(struct pt_regs *regs)
+ long hook__NR_execve(struct pt_regs *regs)
 {
-	if (!nksu_profile_has_uid(current_uid().val))
-		return 0;
-
 	unsigned long new_uaddr = try_redirect_path(regs, 0);
 	if (new_uaddr > 0) {
 		regs->regs[0] = new_uaddr;
@@ -103,11 +96,8 @@ static long hook__NR_execve(struct pt_regs *regs)
 	return 0;
 }
 
-static long hook__NR_execveat(struct pt_regs *regs)
+ long hook__NR_execveat(struct pt_regs *regs)
 {
-	if (!nksu_profile_has_uid(current_uid().val))
-		return 0;
-
 	unsigned long new_uaddr = try_redirect_path(regs, 1);
 	if (new_uaddr > 0) {
 		regs->regs[1] = new_uaddr;
@@ -115,6 +105,8 @@ static long hook__NR_execveat(struct pt_regs *regs)
 	}
 	return 0;
 }
+
+#ifdef CONFIG_NKSU_SYSCALL
 
 int init_syscall_hook(void)
 {

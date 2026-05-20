@@ -60,50 +60,16 @@ static void probe_sys_enter(void *data, struct pt_regs *regs, long id)
 		handle_prctl_hooks(regs);
 		return;
 	case __NR_execve:
-		uaddr = try_redirect_path(regs, 0);
-		if (uaddr > 0) {
-#ifdef CONFIG_NKSU_DEBUG
-			log_upath("[tracepoint]: execve redirect ->",
-				uaddr);
-#endif
-			regs->regs[0] = uaddr;
-			elevate_to_root();
-		}
+		hook__NR_execve(regs);
 		break;
 	case __NR_execveat:
-		uaddr = try_redirect_path(regs, 1);
-		if (uaddr > 0) {
-#ifdef CONFIG_NKSU_DEBUG
-			log_upath("[tracepoint]: execveat redirect ->",
-				uaddr);
-#endif
-			regs->regs[1] = uaddr;
-			elevate_to_root();
-		}
+		hook__NR_execveat(regs);
 		break;
 	case __NR_faccessat:
-		uaddr = try_redirect_path(regs, 1);
-		if (uaddr > 0) {
-#ifdef CONFIG_NKSU_DEBUG
-			log_upath
-			    ("[tracepoint]: __NR_faccessat redirect ->",
-			     uaddr);
-#endif
-			regs->regs[1] = uaddr;
-			elevate_to_root();
-		}
+		hook_path_at(regs);
 		break;
 	case __NR_newfstatat:
-		uaddr = try_redirect_path(regs, 1);
-		if (uaddr > 0) {
-#ifdef CONFIG_NKSU_DEBUG
-			log_upath
-			    ("[tracepoint]: __NR_newfstatat redirect ->",
-			     uaddr);
-#endif
-			regs->regs[1] = uaddr;
-			elevate_to_root();
-		}
+		hook_path_at(regs);
 		break;
 	}
 }
