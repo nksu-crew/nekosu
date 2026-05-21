@@ -14,188 +14,183 @@
 long handle_prctl_hooks(struct pt_regs *regs)
 {
 #if defined(__aarch64__)
-	unsigned long option = regs->regs[0];
+    unsigned long option = regs->regs[0];
 #elif defined(__x86_64__)
-	unsigned long option = regs->di;
+    unsigned long option = regs->di;
 #endif
 
-	if (likely(!is_manager())) {
-		return 0;
-	}
+    if (likely(!is_manager())) {
+        return 0;
+    }
 
-	switch (option) {
-	case 201:
-		fmac_anonfd_get();
-		return 1;
+    switch (option) {
+    case 201:
+        fmac_anonfd_get();
+        return 1;
 
-	case 202:
-		elevate_to_root();
-		return 1;
+    case 202:
+        elevate_to_root();
+        return 1;
 
-	case 203:
-		fmac_ctlfd_get();
-		return 1;
+    case 203:
+        fmac_ctlfd_get();
+        return 1;
 
-	default:
-		return 0;
-	}
+    default:
+        return 0;
+    }
 }
 
-static unsigned long __always_inline
-push_str(unsigned long sp, const char *str, size_t len)
+static unsigned long __always_inline push_str(unsigned long sp, const char *str, size_t len)
 {
-	unsigned long addr;
+    unsigned long addr;
 
-	if (unlikely(!len || len > PAGE_SIZE))
-		return 0;
+    if (unlikely(!len || len > PAGE_SIZE))
+        return 0;
 
-	addr = (sp - 128UL - len) & ~15UL;
+    addr = (sp - 128UL - len) & ~15UL;
 
-	if (unlikely(addr >= sp || !access_ok((void __user *)addr, len)))
-		return 0;
+    if (unlikely(addr >= sp || !access_ok((void __user *)addr, len)))
+        return 0;
 
-	if (unlikely(copy_to_user((void __user *)addr, str, len)))
-		return 0;
+    if (unlikely(copy_to_user((void __user *)addr, str, len)))
+        return 0;
 
-	return addr;
+    return addr;
 }
 
-static unsigned long
-try_redirect_path(struct pt_regs *regs, unsigned int arg_index,
-		  const char *target, size_t target_len)
+static unsigned long try_redirect_path(struct pt_regs *regs, unsigned int arg_index, const char *target,
+                                       size_t target_len)
 {
-	char buf[256];
-	const char __user *upath;
-	unsigned long sp;
-	ssize_t ulen;
+    char buf[256];
+    const char __user *upath;
+    unsigned long sp;
+    ssize_t ulen;
 
-	if (unlikely(!current->mm))
-		return 0;
+    if (unlikely(!current->mm))
+        return 0;
 
-	if (unlikely(arg_index > 7))
-		return 0;
+    if (unlikely(arg_index > 7))
+        return 0;
 
-	if (unlikely(!target || !target_len || target_len > PAGE_SIZE))
-		return 0;
+    if (unlikely(!target || !target_len || target_len > PAGE_SIZE))
+        return 0;
 
-	upath = (const char __user *)regs->regs[arg_index];
-	if (unlikely(!upath))
-		return 0;
+    upath = (const char __user *)regs->regs[arg_index];
+    if (unlikely(!upath))
+        return 0;
 
-	ulen = strncpy_from_user(buf, upath, sizeof(buf));
-	if (unlikely(ulen <= 0))
-		return 0;
+    ulen = strncpy_from_user(buf, upath, sizeof(buf));
+    if (unlikely(ulen <= 0))
+        return 0;
 
-	buf[sizeof(buf) - 1] = '\0';
+    buf[sizeof(buf) - 1] = '\0';
 
-	if (!path_is_su(buf))
-		return 0;
+    if (!path_is_su(buf))
+        return 0;
 
-	sp = user_stack_pointer(regs);
-	if (unlikely(!sp))
-		return 0;
+    sp = user_stack_pointer(regs);
+    if (unlikely(!sp))
+        return 0;
 
-	return push_str(sp, target, target_len);
+    return push_str(sp, target, target_len);
 }
 
 long hook_path_at(struct pt_regs *regs)
 {
-	unsigned long new_uaddr =
-	    try_redirect_path(regs, 1, SH_PATH, SH_PATH_LEN);
-	if (new_uaddr > 0) {
-		regs->regs[1] = new_uaddr;
-	}
-	return 0;
+    unsigned long new_uaddr = try_redirect_path(regs, 1, SH_PATH, SH_PATH_LEN);
+    if (new_uaddr > 0) {
+        regs->regs[1] = new_uaddr;
+    }
+    return 0;
 }
 
 long hook__NR_execve(struct pt_regs *regs)
 {
-	unsigned long new_uaddr =
-	    try_redirect_path(regs, 0, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
-	if (new_uaddr > 0) {
-		regs->regs[0] = new_uaddr;
-		elevate_to_root();
-	}
-	return 0;
+    unsigned long new_uaddr = try_redirect_path(regs, 0, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
+    if (new_uaddr > 0) {
+        regs->regs[0] = new_uaddr;
+        elevate_to_root();
+    }
+    return 0;
 }
 
 long hook__NR_execveat(struct pt_regs *regs)
 {
-	unsigned long new_uaddr =
-	    try_redirect_path(regs, 1, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
-	if (new_uaddr > 0) {
-		regs->regs[1] = new_uaddr;
-		elevate_to_root();
-	}
-	return 0;
+    unsigned long new_uaddr = try_redirect_path(regs, 1, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
+    if (new_uaddr > 0) {
+        regs->regs[1] = new_uaddr;
+        elevate_to_root();
+    }
+    return 0;
 }
 
 #ifdef CONFIG_NKSU_SYSCALL
 
 int init_syscall_hook(void)
 {
-	int ret;
-	ret = nksu_redirect_syscall(__NR_faccessat);
-	if (ret) {
-		pr_err("[hook]: can't redirect faccessat ret %d\n", ret);
-		return ret;
-	}
+    int ret;
+    ret = nksu_redirect_syscall(__NR_faccessat);
+    if (ret) {
+        pr_err("[hook]: can't redirect faccessat ret %d\n", ret);
+        return ret;
+    }
 
-	ret = nksu_redirect_syscall(__NR_newfstatat);
-	if (ret) {
-		pr_err("[hook]: can't redirect newfstatat ret %d\n", ret);
-		return ret;
-	}
+    ret = nksu_redirect_syscall(__NR_newfstatat);
+    if (ret) {
+        pr_err("[hook]: can't redirect newfstatat ret %d\n", ret);
+        return ret;
+    }
 
-	ret = nksu_redirect_syscall(__NR_prctl);
-	if (ret) {
-		pr_err("[hook]: can't redirect prctl ret %d\n", ret);
-		return ret;
-	}
+    ret = nksu_redirect_syscall(__NR_prctl);
+    if (ret) {
+        pr_err("[hook]: can't redirect prctl ret %d\n", ret);
+        return ret;
+    }
 
-	ret = nksu_redirect_syscall(__NR_execve);
-	if (ret) {
-		pr_err("[hook]: can't redirect __NR_execve ret %d\n", ret);
-		return ret;
-	}
+    ret = nksu_redirect_syscall(__NR_execve);
+    if (ret) {
+        pr_err("[hook]: can't redirect __NR_execve ret %d\n", ret);
+        return ret;
+    }
 
-	ret = nksu_redirect_syscall(__NR_execveat);
-	if (ret) {
-		pr_err("[hook]: can't redirect __NR_execveat ret %d\n", ret);
-		return ret;
-	}
+    ret = nksu_redirect_syscall(__NR_execveat);
+    if (ret) {
+        pr_err("[hook]: can't redirect __NR_execveat ret %d\n", ret);
+        return ret;
+    }
 
-	ret = nksu_register_handler(__NR_faccessat, hook_path_at);
-	if (ret) {
-		pr_err("[hook]: can't register faccessat,ret %d\n", ret);
-		return ret;
-	}
+    ret = nksu_register_handler(__NR_faccessat, hook_path_at);
+    if (ret) {
+        pr_err("[hook]: can't register faccessat,ret %d\n", ret);
+        return ret;
+    }
 
-	ret = nksu_register_handler(__NR_newfstatat, hook_path_at);
-	if (ret) {
-		pr_err("[hook]: can't register newfstatat,ret %d\n", ret);
-		return ret;
-	}
+    ret = nksu_register_handler(__NR_newfstatat, hook_path_at);
+    if (ret) {
+        pr_err("[hook]: can't register newfstatat,ret %d\n", ret);
+        return ret;
+    }
 
-	ret = nksu_register_handler(__NR_prctl, handle_prctl_hooks);
-	if (ret) {
-		pr_err("[hook]: can't register prctl,ret %d\n", ret);
-		return ret;
-	}
+    ret = nksu_register_handler(__NR_prctl, handle_prctl_hooks);
+    if (ret) {
+        pr_err("[hook]: can't register prctl,ret %d\n", ret);
+        return ret;
+    }
 
-	ret = nksu_register_handler(__NR_execve, hook__NR_execve);
-	if (ret) {
-		pr_err("[hook]: can't register __NR_execve,ret %d\n", ret);
-		return ret;
-	}
+    ret = nksu_register_handler(__NR_execve, hook__NR_execve);
+    if (ret) {
+        pr_err("[hook]: can't register __NR_execve,ret %d\n", ret);
+        return ret;
+    }
 
-	ret = nksu_register_handler(__NR_execveat, hook__NR_execveat);
-	if (ret) {
-		pr_err("[hook]: can't register __NR_execveat,ret %d\n", ret);
-		return ret;
-	}
+    ret = nksu_register_handler(__NR_execveat, hook__NR_execveat);
+    if (ret) {
+        pr_err("[hook]: can't register __NR_execveat,ret %d\n", ret);
+        return ret;
+    }
 
-	pr_info("[hook]: loaded syscall hook\n");
-	return 0;
+    pr_info("[hook]: loaded syscall hook\n");
+    return 0;
 }
 #endif

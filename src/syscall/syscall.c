@@ -21,11 +21,11 @@ syscall_fn_t *syscall_table;
 
 struct hook_entry {
     unsigned long addr;
-    syscall_fn_t  original;
+    syscall_fn_t original;
 };
 
 static struct hook_entry hook_table[MAX_HOOKS];
-static int               hook_count = 0;
+static int hook_count = 0;
 static DEFINE_SPINLOCK(hook_lock);
 
 static unsigned long phys_from_virt(unsigned long addr, int *err)
@@ -74,10 +74,10 @@ fail:
 }
 
 struct patch_info {
-    void         *dst;
-    syscall_fn_t  newval;
-    atomic_t      cpu_count;
-    int           result;
+    void *dst;
+    syscall_fn_t newval;
+    atomic_t cpu_count;
+    int result;
 };
 
 static int do_patch_nosync(struct patch_info *p)
@@ -122,10 +122,10 @@ static int patch_text_cb(void *arg)
 static int patch_syscall_slot(void *addr, syscall_fn_t newval)
 {
     struct patch_info p = {
-        .dst       = addr,
-        .newval    = newval,
+        .dst = addr,
+        .newval = newval,
         .cpu_count = ATOMIC_INIT(0),
-        .result    = 0,
+        .result = 0,
     };
     int ret = stop_machine(patch_text_cb, &p, cpu_online_mask);
     return ret ? ret : p.result;
@@ -141,7 +141,7 @@ static int syscalltable_hook(unsigned long addr, syscall_fn_t hook_fn)
         spin_unlock_irqrestore(&hook_lock, flags);
         return -ENOMEM;
     }
-    hook_table[hook_count].addr     = addr;
+    hook_table[hook_count].addr = addr;
     hook_table[hook_count].original = *(syscall_fn_t *)addr;
     hook_count++;
     spin_unlock_irqrestore(&hook_lock, flags);
