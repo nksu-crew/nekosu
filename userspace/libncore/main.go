@@ -8,10 +8,6 @@ package main
 #include <string.h>
 #include <stdlib.h>
 
-static jint bridge_GetEnv(JavaVM *vm, JNIEnv **env) {
-    return (*vm)->GetEnv(vm, (void**)env, JNI_VERSION_1_6);
-}
-
 static const char* bridge_GetStringUTFChars(JNIEnv *env, jstring s) {
     if (s == NULL) return NULL;
     return (*env)->GetStringUTFChars(env, s, NULL);

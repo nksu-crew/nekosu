@@ -18,6 +18,7 @@ import (
 )
 
 const logTag = "ncore"
+const tag = C.CString(logTag)
 
 type logPriority = C.int
 
@@ -43,7 +44,6 @@ func Debug(format string, args ...any) {
 func log(priority logPriority, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	cs := C.CString(msg)
-	tag := C.CString(logTag)
 	defer C.free(unsafe.Pointer(cs))
 	defer C.free(unsafe.Pointer(tag))
 	C.bridge_log(priority, tag, cs)
