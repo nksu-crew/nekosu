@@ -1,10 +1,14 @@
-nksu-y += src/anonfd.o src/nksu.o src/privilege.o src/ioctl.o src/manager.o
+nksu-y += src/nksu.o src/privilege.o src/ioctl.o src/manager.o
 
 nksu-y += src/selinux/rule.o src/selinux/selinux.o src/selinux/policy.o src/selinux/domain.o src/selinux/dup.o 
 
 nksu-y += src/profile/profile.o
 nksu-y += src/ns.o
 nksu-y += src/handle.o
+
+nksu-y += src/fd/anonfd.o
+nksu-y += src/fd/eventfd.o
+nksu-y += src/fd/shm_hash.o
 
 ifeq ($(CONFIG_NKSU_SYSCALL),y)
 	ccflags-y += -DCONFIG_NKSU_SYSCALL=1

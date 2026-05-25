@@ -15,13 +15,13 @@
 #include <linux/version.h>
 #include <asm/syscall.h>
 
-#include "klog.h"
-#include "anonfd.h"
 #include "selinux/selinux.h"
 #include "selinux/rule.h"
 #include "selinux/policy.h"
 #include "selinux/domain.h"
 #include "selinux/dup.h"
+
+#include "klog.h"
 #include "privilege.h"
 #include "tracepoint.h"
 #include "ioctl.h"
@@ -30,6 +30,7 @@
 #include "ns.h"
 
 #include "../profile/profile.h"
+#include "../fd/fd.h"
 
 #ifdef CONFIG_NKSU_SYSCALL
 #include "../syscall/dispatch.h"

@@ -7,7 +7,7 @@
 
 #include "hook.h"
 #include "manager.h"
-#include "anonfd.h"
+#include "fd/fd.h"
 #include "privilege.h"
 #include "ioctl.h"
 

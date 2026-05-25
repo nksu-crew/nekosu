@@ -114,7 +114,7 @@ static long fmac_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         int efd;
         if (copy_from_user(&efd, (int __user *)arg, sizeof(efd)))
             return -EFAULT;
-        ret = bind_eventfd(efd);
+        ret = nksu_bind_eventfd(efd);
         break;
     }
 
