@@ -11,5 +11,4 @@ void fmac_notify_user(void);
 void fmac_eventfd_exit(void);
 
 /* shm_hash.c */
-void fmac_hash_init(void);
 bool check_mmap_write(void);
