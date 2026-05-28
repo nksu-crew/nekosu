@@ -4,9 +4,9 @@ package log
 #cgo LDFLAGS: -llog
 #include <android/log.h>
 #include <stdlib.h>
-
-static void bridge_log(int priority, const char *tag, const char *msg) {
-    __android_log_print(priority, tag, "%s", msg);
+#define LOG_TAG "ncore"
+static void bridge_log(int priority, const char *msg) {
+    __android_log_print(priority, LOG_TAG, "%s", msg);
 }
 
 */
@@ -16,9 +16,6 @@ import (
 	"fmt"
 	"unsafe"
 )
-
-const logTag = "ncore"
-const tag = C.CString(logTag)
 
 type logPriority = C.int
 
@@ -45,6 +42,5 @@ func log(priority logPriority, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	cs := C.CString(msg)
 	defer C.free(unsafe.Pointer(cs))
-	defer C.free(unsafe.Pointer(tag))
-	C.bridge_log(priority, tag, cs)
+	C.bridge_log(priority, cs)
 }
