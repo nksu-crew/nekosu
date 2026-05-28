@@ -188,14 +188,13 @@ func main() {
 						},
 					},
 					// TODO
-					/*	{
-						Name:      "install",
-						Usage:     "install module",
-						ArgsUsage: "<path>",
+					{
+						Name:  "run",
+						Usage: "run modules",
 						Action: func(ctx context.Context, cmd *cli.Command) error {
-							return nil
+							return module.RunModules()
 						},
-					},*/
+					},
 				},
 			},
 		},

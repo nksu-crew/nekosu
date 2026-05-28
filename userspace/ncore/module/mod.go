@@ -24,6 +24,15 @@ func ListModules() ([]string, error) {
 	return modules, nil
 }
 
+func RunModules() error {
+	mod, err := ListModules()
+	if err != nil {
+		return err
+	}
+	Run(mod)
+	return nil
+}
+
 func ShowModules() error {
 	mod, err := ListModules()
 	if err != nil {
