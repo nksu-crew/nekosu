@@ -9,6 +9,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"nekosu/ncore/boot"
 	"nekosu/ncore/kmod"
+	"nekosu/ncore/module"
 )
 
 func main() {
@@ -173,6 +174,28 @@ func main() {
 							return nil
 						},
 					},
+				},
+			},
+			{
+				Name:  "mod",
+				Usage: "load module",
+				Commands: []*cli.Command{
+					{
+						Name:  "show",
+						Usage: "show all installed module.",
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							return module.ShowModules()
+						},
+					},
+					// TODO
+					/*	{
+						Name:      "install",
+						Usage:     "install module",
+						ArgsUsage: "<path>",
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							return nil
+						},
+					},*/
 				},
 			},
 		},
