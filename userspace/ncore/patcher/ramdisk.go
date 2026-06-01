@@ -30,7 +30,6 @@ type FormatEntry struct {
 	Name      string
 	Desc      string
 	Magic     []byte
-	Offset    int
 	KernelCfg string
 }
 
@@ -48,11 +47,11 @@ var formats = []FormatEntry{
 	{Name: "cpio-binary", Desc: "CPIO archive (binary)", Magic: magicCPIOBin},
 }
 
-func matchMagic(buf, magic []byte, offset int) bool {
-	if offset+len(magic) > len(buf) {
+func matchMagic(buf, magic []byte) bool {
+	if len(magic) > len(buf) {
 		return false
 	}
-	return bytes.Equal(buf[offset:offset+len(magic)], magic)
+	return bytes.Equal(buf[:len(magic)], magic)
 }
 
 func printHexDump(buf []byte, max int) {
@@ -72,7 +71,7 @@ func DetectFormat(buf []byte) *FormatEntry {
 		buf = buf[:32]
 	}
 	for i := range formats {
-		if matchMagic(buf, formats[i].Magic, formats[i].Offset) {
+		if matchMagic(buf, formats[i].Magic) {
 			return &formats[i]
 		}
 	}
@@ -94,7 +93,7 @@ func Detect(buf []byte) int {
 
 	matched := false
 	for _, e := range formats {
-		if matchMagic(buf, e.Magic, e.Offset) {
+		if matchMagic(buf, e.Magic) {
 			fmt.Printf("[MATCH] %-14s  %s\n", e.Name, e.Desc)
 			if e.KernelCfg != "" {
 				fmt.Printf("        Kernel config : %s=y\n", e.KernelCfg)
