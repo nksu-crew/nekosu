@@ -5,99 +5,105 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/urfave/cli/v3"
 	"nekosu/ncore/boot"
-	"nekosu/ncore/init"
 	"nekosu/ncore/kmod"
 	"nekosu/ncore/module"
+	"nekosu/ncore/patcher"
 )
 
 func main() {
-	if filepath.Base(os.Args[0]) == "init" {
-		rd_init.Main()
-	} else {
-		cmd := &cli.Command{
-			Name:  "ncore",
-			Usage: "nekosu userspace tools.",
-			Commands: []*cli.Command{
-				{
-					Name:      "load",
-					Usage:     "load kernel module",
-					ArgsUsage: "<path>",
-					Action: func(ctx context.Context, cmd *cli.Command) error {
-						if cmd.Args().Len() == 0 {
-							return fmt.Errorf("path required")
-						}
-						return kmod.Load(cmd.Args().First())
-					},
+	cmd := &cli.Command{
+		Name:  "ncore",
+		Usage: "nekosu userspace tools.",
+		Commands: []*cli.Command{
+			{
+				Name:      "load",
+				Usage:     "load kernel module",
+				ArgsUsage: "<path>",
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					if cmd.Args().Len() == 0 {
+						return fmt.Errorf("path required")
+					}
+					return kmod.Load(cmd.Args().First())
 				},
-				{
-					Name:  "boot",
-					Usage: "boot image tools",
-					Commands: []*cli.Command{
-						{
-							Name:      "unpack",
-							Usage:     "unpack boot image",
-							ArgsUsage: "<image> <outdir>",
-							Action: func(ctx context.Context, cmd *cli.Command) error {
-								if cmd.Args().Len() < 2 {
-									return fmt.Errorf("usage: unpack <image> <outdir>")
-								}
-								return bootUnpack(cmd.Args().Get(0), cmd.Args().Get(1))
-							},
-						},
-						{
-							Name:      "repack",
-							Usage:     "repack boot image from unpacked dir",
-							ArgsUsage: "<original> <indir> <output>",
-							Action: func(ctx context.Context, cmd *cli.Command) error {
-								if cmd.Args().Len() < 3 {
-									return fmt.Errorf("usage: repack <original> <indir> <output>")
-								}
-								return bootRepack(cmd.Args().Get(0), cmd.Args().Get(1), cmd.Args().Get(2))
-							},
-						},
-						{
-							Name:      "info",
-							Usage:     "print boot image header info",
-							ArgsUsage: "<image>",
-							Action: func(ctx context.Context, cmd *cli.Command) error {
-								if cmd.Args().Len() == 0 {
-									return fmt.Errorf("image path required")
-								}
-								return bootInfo(cmd.Args().First())
-							},
+			},
+			{
+				Name:  "boot",
+				Usage: "boot image tools",
+				Commands: []*cli.Command{
+					{
+						Name:      "unpack",
+						Usage:     "unpack boot image",
+						ArgsUsage: "<image> <outdir>",
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							if cmd.Args().Len() < 2 {
+								return fmt.Errorf("usage: unpack <image> <outdir>")
+							}
+							return bootUnpack(cmd.Args().Get(0), cmd.Args().Get(1))
 						},
 					},
-				},
-				{
-					Name:  "mod",
-					Usage: "load userspace module",
-					Commands: []*cli.Command{
-						{
-							Name:  "show",
-							Usage: "show all installed module.",
-							Action: func(ctx context.Context, cmd *cli.Command) error {
-								return module.ShowModules()
-							},
+					{
+						Name:      "repack",
+						Usage:     "repack boot image from unpacked dir",
+						ArgsUsage: "<original> <indir> <output>",
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							if cmd.Args().Len() < 3 {
+								return fmt.Errorf("usage: repack <original> <indir> <output>")
+							}
+							return bootRepack(cmd.Args().Get(0), cmd.Args().Get(1), cmd.Args().Get(2))
 						},
-						{
-							Name:  "run",
-							Usage: "run modules",
-							Action: func(ctx context.Context, cmd *cli.Command) error {
-								return module.RunModules()
-							},
+					},
+					{
+						Name:      "patch",
+						Usage:     "patch boot image: backup old init to init.real and inject new init",
+						ArgsUsage: "<image> <new_init_path> <output>",
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							if cmd.Args().Len() < 3 {
+								return fmt.Errorf("usage: patch <image> <new_init_path> <output>")
+							}
+							return bootPatch(cmd.Args().Get(0), cmd.Args().Get(1), cmd.Args().Get(2))
+						},
+					},
+					{
+						Name:      "info",
+						Usage:     "print boot image header info",
+						ArgsUsage: "<image>",
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							if cmd.Args().Len() == 0 {
+								return fmt.Errorf("image path required")
+							}
+							return bootInfo(cmd.Args().First())
 						},
 					},
 				},
 			},
-		}
+			{
+				Name:  "mod",
+				Usage: "load userspace module",
+				Commands: []*cli.Command{
+					{
+						Name:  "show",
+						Usage: "show all installed module.",
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							return module.ShowModules()
+						},
+					},
+					{
+						Name:  "run",
+						Usage: "run modules",
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							return module.RunModules()
+						},
+					},
+				},
+			},
+		},
+	}
 
-		if err := cmd.Run(context.Background(), os.Args); err != nil {
-			log.Fatal(err)
-		}
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -168,6 +174,28 @@ func bootRepack(origPath, inDir, outPath string) error {
 	}
 
 	fmt.Printf("wrote %s\n", outPath)
+	return nil
+}
+
+func bootPatch(origPath, newInitPath, outPath string) error {
+	newInitBytes, err := os.ReadFile(newInitPath)
+	if err != nil {
+		return fmt.Errorf("read new init file: %w", err)
+	}
+
+	bp, err := patcher.OpenBootImage(origPath)
+	if err != nil {
+		return fmt.Errorf("open boot image: %w", err)
+	}
+
+	if err := bp.ReplaceInitAndBackupOld(newInitBytes); err != nil {
+		return fmt.Errorf("replace and backup init: %w", err)
+	}
+
+	if err := bp.Save(outPath); err != nil {
+		return fmt.Errorf("save patched image: %w", err)
+	}
+
 	return nil
 }
 
