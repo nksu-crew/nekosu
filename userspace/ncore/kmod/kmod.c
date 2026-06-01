@@ -24,7 +24,7 @@ static int kptr_set(char code)
         return -errno;
 
     char buf = 0;
-    if (read(fd, &buf, 1) == 1) {
+    if (read(fd, &buf, 1) == 1 && buf >= '0' && buf <= '9') {
         s_kptr_saved = buf;
         s_kptr_inited = 1;
     }
@@ -105,16 +105,17 @@ static int parse_kallsyms(HashTable *ht)
 
     while (fgets(line, sizeof(line), f)) {
         /* Format: <addr> <type> <name>[\t<module>] */
-        char *tok = strtok(line, " \t\n");
+        char *saveptr = NULL;
+        char *tok = strtok_r(line, " \t\n", &saveptr);
         if (!tok)
             continue;
         uint64_t addr = hex_to_u64(tok);
 
-        tok = strtok(NULL, " \t\n"); /* type — skip */
+        tok = strtok_r(NULL, " \t\n", &saveptr); /* type — skip */
         if (!tok)
             continue;
 
-        tok = strtok(NULL, " \t\n"); /* name */
+        tok = strtok_r(NULL, " \t\n", &saveptr); /* name */
         if (!tok)
             continue;
 
@@ -178,6 +179,13 @@ static int patch_and_load(const char *path, const HashTable *ksyms)
         return -EINVAL;
     }
 
+    /* Validate section header table bounds */
+    if ((uint64_t)ehdr->e_shoff + (uint64_t)ehdr->e_shnum * sizeof(Elf64_Shdr) > (uint64_t)fsz) {
+        fprintf(stderr, "ELF section header table out of bounds\n");
+        free(image);
+        return -EINVAL;
+    }
+
     Elf64_Shdr *shdr = (Elf64_Shdr *)(image + ehdr->e_shoff);
     Elf64_Shdr *sym_shdr = NULL;
 
@@ -194,7 +202,29 @@ static int patch_and_load(const char *path, const HashTable *ksyms)
         return -EINVAL;
     }
 
+    /* Validate sh_link before indexing shdr[] */
+    if (sym_shdr->sh_link >= ehdr->e_shnum) {
+        fprintf(stderr, "SYMTAB sh_link out of bounds\n");
+        free(image);
+        return -EINVAL;
+    }
+
     Elf64_Shdr *str_shdr = &shdr[sym_shdr->sh_link];
+
+    /* Validate symtab and strtab section data bounds */
+    if ((uint64_t)sym_shdr->sh_offset + sym_shdr->sh_size > (uint64_t)fsz ||
+        (uint64_t)str_shdr->sh_offset + str_shdr->sh_size > (uint64_t)fsz) {
+        fprintf(stderr, "ELF section data out of bounds\n");
+        free(image);
+        return -EINVAL;
+    }
+
+    if (sym_shdr->sh_entsize == 0 || sym_shdr->sh_entsize < sizeof(Elf64_Sym)) {
+        fprintf(stderr, "invalid SYMTAB sh_entsize\n");
+        free(image);
+        return -EINVAL;
+    }
+
     const char *strtab = (const char *)(image + str_shdr->sh_offset);
 
     Elf64_Sym *symtab = (Elf64_Sym *)(image + sym_shdr->sh_offset);

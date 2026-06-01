@@ -7,6 +7,7 @@ package kmod
 import "C"
 import (
 	"fmt"
+	"syscall"
 	"unsafe"
 )
 
@@ -16,7 +17,7 @@ func Load(path string) error {
 
 	rc := C.kmod_load(cpath)
 	if rc != 0 {
-		return fmt.Errorf("kmod_load(%s) = %d", path, int(rc))
+		return fmt.Errorf("kmod_load(%s): %w", path, syscall.Errno(-rc))
 	}
 	return nil
 }

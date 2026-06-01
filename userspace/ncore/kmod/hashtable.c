@@ -13,12 +13,12 @@ static uint64_t hash_fnv1a(const char *str)
     return hash;
 }
 
-static void ht_rehash(HashTable *ht)
+static int ht_rehash(HashTable *ht)
 {
     size_t new_size = ht->size * 2;
     HashNode **new_buckets = calloc(new_size, sizeof(HashNode *));
     if (!new_buckets)
-        return;
+        return -1;
 
     for (size_t i = 0; i < ht->size; i++) {
         HashNode *node = ht->buckets[i];
@@ -35,6 +35,7 @@ static void ht_rehash(HashTable *ht)
     free(ht->buckets);
     ht->buckets = new_buckets;
     ht->size = new_size;
+    return 0;
 }
 
 HashTable *ht_create(size_t init_size)
@@ -60,7 +61,8 @@ int ht_put(HashTable *ht, const char *key, uint64_t value)
         return -1;
 
     if (ht->count >= ht->size * 3 / 4) {
-        ht_rehash(ht);
+        if (ht_rehash(ht) < 0)
+            return -1;
     }
 
     uint64_t h = hash_fnv1a(key) % ht->size;
