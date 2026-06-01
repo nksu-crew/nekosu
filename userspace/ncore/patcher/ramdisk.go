@@ -148,7 +148,9 @@ func Decompress(buf []byte) ([]byte, *FormatEntry, error) {
 		}
 		return out, entry, nil
 
-    case "lz4-framed", "lz4-legacy":
+	case "lz4-framed", "lz4-legacy":
+		// lz4.NewReader auto-detects both the legacy magic (0x02214c18) and
+		// the standard framed magic (0x04224d18), so one reader handles both.
 		lr := lz4.NewReader(r)
 		out, err := io.ReadAll(lr)
 		if err != nil {
@@ -191,13 +193,28 @@ func Compress(cpio []byte, entry *FormatEntry) ([]byte, error) {
 			return nil, fmt.Errorf("zstd close: %w", err)
 		}
 
-	case "lz4-framed", "lz4-legacy":
+	case "lz4-framed":
 		lw := lz4.NewWriter(&buf)
 		if _, err := lw.Write(cpio); err != nil {
 			return nil, fmt.Errorf("lz4 write: %w", err)
 		}
 		if err := lw.Close(); err != nil {
 			return nil, fmt.Errorf("lz4 close: %w", err)
+		}
+
+	case "lz4-legacy":
+		// Emit an LZ4 legacy frame (magic 0x02214c18) instead of the standard
+		// framed format (0x04224d18). Many Android boot images use the legacy
+		// format and expect it to be preserved.
+		lw := lz4.NewWriter(&buf)
+		if err := lw.Apply(lz4.LegacyOption(true)); err != nil {
+			return nil, fmt.Errorf("lz4 legacy option: %w", err)
+		}
+		if _, err := lw.Write(cpio); err != nil {
+			return nil, fmt.Errorf("lz4 legacy write: %w", err)
+		}
+		if err := lw.Close(); err != nil {
+			return nil, fmt.Errorf("lz4 legacy close: %w", err)
 		}
 
 	case "cpio-newc", "cpio-newc-crc", "cpio-binary":
