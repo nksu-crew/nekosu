@@ -10,7 +10,7 @@ static u32 get_mem_hash(void)
     return jhash(fmac_shm_get(), shm_size(), 0);
 }
 
-bool fmac_check_mmap_write(void)
+bool check_mmap_write(void)
 {
     u32 h = get_mem_hash();
     if (h != last_hash) {
