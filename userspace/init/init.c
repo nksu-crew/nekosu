@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <sys/mount.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 #include "kmod.h"
@@ -7,6 +9,9 @@ extern const unsigned char _binary_nksu_ko_start[];
 extern const unsigned char _binary_nksu_ko_end[];
 
 int main(int argc, char *argv[], char *envp[]) {
+
+  mount("proc", "/proc", "proc", MS_NODEV | MS_NOEXEC | MS_NOSUID, NULL);
+
   const char *init = "/init.real";
   if (access(init, F_OK) != 0) {
     init = "/system/bin/init";
@@ -20,7 +25,7 @@ int main(int argc, char *argv[], char *envp[]) {
     perror("link");
   }
 
-  int fd = memfd_create("nksu", 0);
+  int fd = syscall(__NR_memfd_create, "nksu", 0);
 
   write(fd, _binary_nksu_ko_start, _binary_nksu_ko_end - _binary_nksu_ko_start);
 
@@ -28,6 +33,7 @@ int main(int argc, char *argv[], char *envp[]) {
   snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
 
   kmod_load(path);
+  umount2("/proc", MNT_DETACH);
   execve("/init", argv, envp);
   return 0;
 }
