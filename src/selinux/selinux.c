@@ -67,7 +67,7 @@ bool do_allow(struct policydb *db, const char *type_name)
     return true;
 }
 
-int load_hook()
+int load_hook(void)
 {
     int rc;
 #ifdef CONFIG_NKSU_DEBUG
