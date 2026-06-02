@@ -7,6 +7,8 @@
 
 #include <fmac.h>
 
+static struct task_struct *nksu_init_thread;
+
 void setenforce(bool status)
 {
 // true or false
@@ -65,13 +67,12 @@ bool do_allow(struct policydb *db, const char *type_name)
     return true;
 }
 
-int __init init_selinux_hook(void)
+int load_hook()
 {
-    struct policydb *db;
     int rc;
-    if (!selinux_state.policy)
-        return -1;
-
+#ifdef CONFIG_NKSU_DEBUG
+    struct policydb *db;
+#endif
     if (!getenforce()) {
         pr_info("[selinux]: enforcing is false,set 1\n");
         setenforce(true);
@@ -111,12 +112,58 @@ int __init init_selinux_hook(void)
     mutex_unlock(&selinux_state.policy_mutex);
     avc_reset();
 #endif
-
     return 0;
+}
+
+static int nksu_selinux_init_thread(void *data)
+{
+    int ret;
+
+    pr_info("[selinux]: waiting for SELinux policy...\n");
+
+    int timeout_ms = 30 * 1000;
+    while (timeout_ms > 0) {
+        if (kthread_should_stop())
+            return -EINTR;
+
+        if (READ_ONCE(selinux_state.policy))
+            break;
+
+        msleep(10);
+        timeout_ms -= 10;
+    }
+
+    if (!READ_ONCE(selinux_state.policy)) {
+        pr_err("ncore: SELinux policy not ready after 30s, giving up\n");
+        return -ETIMEDOUT;
+    }
+
+    pr_info("ncore: SELinux policy ready, continuing init\n");
+
+    return load_hook();
+}
+
+int __init init_selinux_hook(void)
+{
+    int rc;
+    if (!selinux_state.policy) {
+        nksu_init_thread = kthread_run(nksu_selinux_init_thread, NULL, "nksu-selinux-init");
+        if (IS_ERR(nksu_init_thread)) {
+            pr_err("ncore: failed to start init thread: %ld\n", PTR_ERR(nksu_init_thread));
+            return PTR_ERR(nksu_init_thread);
+        }
+        return 0;
+    } else {
+        return load_hook();
+    }
 }
 
 void __exit selinux_exit(void)
 {
     pr_info("[selinux]: sepolicy exit – restoring original policy\n");
+    if (nksu_init_thread) {
+        kthread_stop(nksu_init_thread);
+        nksu_init_thread = NULL;
+    }
     sepolicy_restore();
 }
