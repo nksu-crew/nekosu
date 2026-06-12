@@ -151,7 +151,7 @@ int load_policy(void)
     return 0;
 }
 
-int __init sepolicy_init(void)
+int sepolicy_init(void)
 {
     int ret;
 
@@ -163,7 +163,7 @@ int __init sepolicy_init(void)
     return 0;
 }
 
-void __exit sepolicy_exit(void)
+void sepolicy_exit(void)
 {
     pr_info("[selinux]: sepolicy exit\n");
 }
