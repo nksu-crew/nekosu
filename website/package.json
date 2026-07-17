@@ -14,7 +14,7 @@
     "@vuepress/bundler-vite": "^2.0.0-rc.26",
     "@vuepress/plugin-markdown-math": "^2.0.0-rc.122",
     "@vuepress/theme-default": "^2.0.0-rc.122",
-    "katex": "^0.16.28",
+    "katex": "^0.17.0",
     "sass-embedded": "^1.86.0",
     "sass-loader": "^16.0.5",
     "vue": "^3.5.13",
