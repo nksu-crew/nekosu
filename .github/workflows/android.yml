@@ -9,6 +9,7 @@ on:
       - "manager/build.gradle.kts"
       - "manager/gradle/libs.versions.toml"
       - "manager/app/src/**/*.c"
+      - "userspace/ncore/**/*.rs"
   pull_request:
     branches: [ "main" ]
     paths:
@@ -16,6 +17,7 @@ on:
       - "manager/build.gradle.kts"
       - "manager/gradle/libs.versions.toml"
       - "manager/app/src/**/*.c"
+      - "userspace/ncore/**/*.rs"
 
 jobs:
   build:
