@@ -1,0 +1,51 @@
+name: Android CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "manager/app/src/**/*.kt"
+      - "manager/build.gradle.kts"
+      - "manager/gradle/libs.versions.toml"
+      - "manager/app/src/**/*.c"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "manager/app/src/**/*.kt"
+      - "manager/build.gradle.kts"
+      - "manager/gradle/libs.versions.toml"
+      - "manager/app/src/**/*.c"
+
+jobs:
+  build:
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v5
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: gradle
+          
+    - name: Decode Release Keystore
+      run: |
+        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > manager/release.keystore
+
+    - name: Build with Gradle
+      working-directory: manager
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      run: gradle assembleRelease --no-daemon
+
+    - name: Upload Release Artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: release
+        path: manager/app/build/outputs/apk/release/*.apk

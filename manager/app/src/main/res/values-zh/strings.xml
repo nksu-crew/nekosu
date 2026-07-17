@@ -1,0 +1,230 @@
+<resources>
+    <string name="app_name">NekoSU</string>
+    <string name="installed">已安装</string>
+    <string name="not_installed">未安装</string>
+    <string name="update_available">可更新</string>
+    <string name="running">运行中</string>
+    <string name="click_to_install">点击安装</string>
+    <string name="superuser">超级用户</string>
+    <string name="fmac_rules">FMAC 规则</string>
+
+    <string name="all_app">全部应用</string>
+    <string name="can_launch_app">可用应用</string>
+    <string name="system_app">系统应用</string>
+    <string name="user_app">用户应用</string>
+    <string name="loading_app">加载应用列表</string>
+
+    <string name="search">搜索</string>
+    <string name="filter">过滤</string>
+    <string name="export_log">导出调试日志</string>
+    <string name="export_log_describe">收集系统日志用于故障排查</string>
+    <string name="close_search">关闭</string>
+    <string name="search_hint">搜索应用或包名</string>
+    <string name="no_app_found">未找到应用</string>
+    <string name="sig_check_failed">签名校验失败，可能被篡改或非官方应用，退出</string>
+    <string name="settings_title">设置</string>
+    <string name="about">关于</string>
+    <string name="dialog_key_title">设置密钥</string>
+    <string name="dialog_key_desc">请输入密钥</string>
+    <string name="dialog_key_label">密钥</string>
+    <string name="dialog_key_error">密钥不允许为空</string>
+    <string name="dialog_key_save">保存</string>
+    <string name="dialog_key_later">稍候设置</string>
+    <string name="dialog_key_please_input">请输入 OpenSSL 生成的椭圆曲线私钥 (PEM 格式):</string>
+    <string name="dialog_key_set">配置 ECC 密钥</string>
+    <string name="dialog_key_input_no_empty">错误：密钥不能为空</string>
+    <string name="dialog_key_input_invalid">错误：无效密钥格式</string>
+    <string name="theme_title">外观</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="navbar_style_title">导航栏样式</string>
+    <string name="navbar_style_floating">悬浮</string>
+    <string name="navbar_style_normal">普通</string>
+    <string name="pager_anim_title">页面切换动画</string>
+    <string name="pager_anim_default">快速</string>
+    <string name="pager_anim_spring">弹簧物理</string>
+
+    <!-- 底部导航栏 -->
+    <string name="nav_home">首页</string>
+    <string name="nav_apps">应用</string>
+    <string name="nav_rules">规则</string>
+    <string name="nav_settings">设置</string>
+
+    <string name="kernel_version">内核版本</string>
+    <string name="android_version">Android 版本</string>
+    <string name="device_model">设备</string>
+    <string name="manager_version">管理器版本</string>
+
+    <!-- 语言 -->
+    <string name="language_title">语言</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_zh_cn">简体中文</string>
+    <string name="language_en">English</string>
+
+    <!-- 设置 — 主题 -->
+    <string name="settings_theme_color">主题色</string>
+    <string name="settings_amoled_black">AMOLED 纯黑</string>
+    <string name="settings_amoled_black_summary">深色模式下使用纯黑色背景</string>
+
+    <!-- 设置 — 开发者 -->
+    <string name="settings_debug">开发者调试</string>
+    <string name="settings_debug_summary">开发者调试选项</string>
+    <string name="settings_fmac_config">FMAC规则配置</string>
+    <string name="settings_fmac_config_summary">显示 FMAC 规则页面（实验性功能）</string>
+    <string name="settings_selinux_rules">SELinux 规则</string>
+    <string name="settings_selinux_rules_summary">动态注入 SELinux policy 规则</string>
+
+    <!-- 关于 -->
+    <string name="about_version">版本</string>
+    <string name="about_repository">仓库</string>
+    <string name="about_repository_summary">在 GitHub 仓库查看源码</string>
+    <string name="about_open_source">开放源代码许可</string>
+    <string name="about_preview_version">预览版</string>
+    <string name="about_unknown_version">未知版本</string>
+    <string name="cd_back">返回</string>
+    <string name="cd_save">保存</string>
+    <string name="cd_reset">重置</string>
+    <string name="cd_delete">删除</string>
+
+    <!-- App Detail -->
+    <string name="app_tag_system">系统</string>
+    <string name="app_uid_format">UID: %d</string>
+    <string name="app_allow_root">允许 Root 访问</string>
+    <string name="app_status_granted">已授权</string>
+    <string name="app_status_denied">已拒绝</string>
+    <string name="app_caps_selected">%1$d / %2$d 已选</string>
+    <string name="app_enable_root_first">请先启用 Root 授权</string>
+    <string name="app_no_capabilities">无 capabilities</string>
+    <string name="app_selinux_domain">SELinux Domain</string>
+    <string name="app_mount_namespace">Mount 命名空间</string>
+
+    <!-- 通用对话框 -->
+    <string name="dialog_select_all">全选</string>
+    <string name="dialog_default">默认</string>
+    <string name="dialog_clear">清空</string>
+    <string name="dialog_confirm">确定</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="dialog_add">添加</string>
+
+    <!-- FMAC 规则 -->
+    <string name="fmac_rule_count">%d 条规则</string>
+    <string name="fmac_add_rule">添加规则</string>
+    <string name="fmac_no_rules">暂无规则</string>
+    <string name="fmac_path">路径</string>
+    <string name="fmac_path_not_empty">路径不能为空</string>
+    <string name="fmac_permission_bits">权限位</string>
+    <string name="fmac_label_deny">DENY</string>
+    <string name="fmac_label_allow">ALLOW</string>
+
+    <!-- Toast -->
+    <string name="toast_deleted">已删除</string>
+    <string name="toast_delete_failed">删除失败</string>
+    <string name="toast_rule_added">规则已添加</string>
+    <string name="toast_add_failed">添加失败</string>
+
+    <!-- 开放源代码 -->
+    <string name="open_source_title">开放源代码许可</string>
+
+    <!-- Capabilities 对话框 -->
+    <string name="dialog_caps_title">Capabilities  ·  %1$d / %2$d</string>
+
+    <!-- Mount 命名空间选项 -->
+    <string name="namespace_inherited_label">继承</string>
+    <string name="namespace_inherited_desc">沿用调用方的 mount 命名空间</string>
+    <string name="namespace_individual_label">独立</string>
+    <string name="namespace_individual_desc">为此 UID 创建独立 mount 命名空间</string>
+    <string name="namespace_global_label">全局</string>
+    <string name="namespace_global_desc">加入全局共享命名空间</string>
+
+    <!-- Linux Capabilities 描述 -->
+    <string name="cap_desc_chown">任意更改文件 UID/GID</string>
+    <string name="cap_desc_dac_override">绕过文件读写执行权限检查</string>
+    <string name="cap_desc_dac_read_search">绕过文件读取/目录搜索权限检查</string>
+    <string name="cap_desc_fowner">绕过需要文件所有者检查的操作</string>
+    <string name="cap_desc_fsetid">文件修改后保留 setuid/setgid 位</string>
+    <string name="cap_desc_kill">向任意进程发送信号</string>
+    <string name="cap_desc_setgid">任意更改进程 GID</string>
+    <string name="cap_desc_setuid">任意更改进程 UID</string>
+    <string name="cap_desc_setpcap">修改进程 capability 集合</string>
+    <string name="cap_desc_linux_immutable">修改文件的不可变 (i) 和只追加 (a) 属性</string>
+    <string name="cap_desc_net_bind_service">绑定 1024 以下特权端口</string>
+    <string name="cap_desc_net_broadcast">网络广播和多播访问</string>
+    <string name="cap_desc_net_admin">网络配置（接口/路由/防火墙）</string>
+    <string name="cap_desc_net_raw">使用原始/数据报套接字 (ping/tcpdump)</string>
+    <string name="cap_desc_ipc_lock">锁定共享内存段</string>
+    <string name="cap_desc_ipc_owner">绕过 IPC 所有者检查</string>
+    <string name="cap_desc_sys_module">加载/卸载内核模块</string>
+    <string name="cap_desc_sys_rawio">访问 /dev/mem、ioperm 等底层 IO</string>
+    <string name="cap_desc_sys_chroot">调用 chroot()</string>
+    <string name="cap_desc_sys_ptrace">ptrace/调试任意进程</string>
+    <string name="cap_desc_sys_pacct">配置进程记账</string>
+    <string name="cap_desc_sys_admin">万能管理权限（挂载/命名空间/设置主机名等）</string>
+    <string name="cap_desc_sys_boot">调用 reboot() 和加载新内核</string>
+    <string name="cap_desc_sys_nice">提升进程优先级/设置调度策略</string>
+    <string name="cap_desc_sys_resource">配置系统资源限制（磁盘配额/保留空间）</string>
+    <string name="cap_desc_sys_time">修改系统时钟/实时时钟</string>
+    <string name="cap_desc_sys_tty_config">配置 TTY 设备</string>
+    <string name="cap_desc_mknod">使用 mknod() 创建特殊文件</string>
+    <string name="cap_desc_lease">对文件建立租借锁</string>
+    <string name="cap_desc_audit_write">写入内核审计日志</string>
+    <string name="cap_desc_audit_control">配置内核审计子系统</string>
+    <string name="cap_desc_setfcap">设置文件 Capabilities</string>
+    <string name="cap_desc_mac_override">绕过强制访问控制 (LSM/SELinux)</string>
+    <string name="cap_desc_mac_admin">配置/修改策略 (LSM/SELinux)</string>
+    <string name="cap_desc_syslog">特权 syslog 操作/读取 /proc/kmsg</string>
+    <string name="cap_desc_wake_alarm">设置定时唤醒系统的闹钟</string>
+    <string name="cap_desc_block_suspend">防止系统进入休眠状态</string>
+    <string name="cap_desc_audit_read">读取审计日志流</string>
+    <string name="cap_desc_perfmon">执行性能监控操作</string>
+    <string name="cap_desc_bpf">加载和管理 BPF 程序</string>
+    <string name="cap_desc_checkpoint_restore">执行检查点和恢复操作</string>
+
+    <!-- SELinux 规则页面 -->
+    <string name="selinux_group_count">%1$d 个分组 · %2$d 条规则</string>
+    <string name="selinux_rule_count">%d 条规则</string>
+    <string name="selinux_clear_all">清除全部</string>
+    <string name="selinux_apply_all">全部应用</string>
+    <string name="selinux_new_group">新建分组</string>
+    <string name="selinux_edit_group">编辑分组</string>
+    <string name="selinux_group_name">分组名称</string>
+    <string name="selinux_required">必需</string>
+    <string name="selinux_required_desc">加载失败时中止</string>
+    <string name="selinux_optional">可选</string>
+    <string name="selinux_no_rules_hint">暂无规则 — 点击 + 添加</string>
+    <string name="selinux_no_groups">暂无分组</string>
+    <string name="selinux_no_groups_hint">点击「新建分组」开始</string>
+    <string name="selinux_invert">反转</string>
+    <string name="selinux_invert_desc">ALLOW → DENY</string>
+    <string name="selinux_add_rule">添加规则</string>
+    <string name="selinux_edit_rule">编辑规则</string>
+    <string name="selinux_effect">效果</string>
+    <string name="selinux_applied_count">已应用 %d 条规则</string>
+    <string name="selinux_applied_failed">%d 条失败</string>
+    <string name="selinux_rule_applied">规则已应用</string>
+    <string name="selinux_rule_failed">失败 (ret=%d)</string>
+    <string name="selinux_group_applied">[%1$s] 已应用 %2$d</string>
+    <string name="selinux_empty_value">*</string>
+    <string name="selinux_label_required">必需</string>
+    <string name="selinux_label_allow">ALLOW</string>
+    <string name="selinux_label_deny">DENY</string>
+    <string name="selinux_label_auditallow">AUDITALLOW</string>
+    <string name="selinux_label_auditdeny">AUDITDENY</string>
+    <string name="selinux_label_transition">TRANSITION</string>
+
+    <string name="cd_apply_group">应用分组</string>
+    <string name="cd_edit_group">编辑分组</string>
+    <string name="cd_delete_group">删除分组</string>
+    <string name="cd_apply">应用</string>
+    <string name="cd_edit">编辑</string>
+
+    <string name="dialog_save">保存</string>
+    <string name="status_card_need_update">需要更新</string>
+    <string name="status_card_not_installed">未安装</string>
+    <string name="status_card_click_to_install">点击安装</string>
+    <string name="animation_type_title">动画类型</string>
+<string name="animation_speed_title">动画速度</string>
+<string name="about_card_description">了解 sayasu 更多功能及使用方法</string>
+<string name="about_card_title">了解 sayasu</string>
+<string name="finger_print">指纹</string>
+</resources>

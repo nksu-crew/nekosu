@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="nksu_cache" path="." />
+    
+    <files-path name="nksu_files" path="." />
+</paths>
