@@ -68,8 +68,8 @@ jobs:
 
         mkdir -p manager/app/src/main/jniLibs/arm64-v8a
         mkdir -p manager/app/src/main/jniLibs/x86_64
-        cp target/aarch64-linux-android/release/cli manager/app/src/main/jniLibs/arm64-v8a/libncore.so
-        cp target/x86_64-linux-android/release/cli manager/app/src/main/jniLibs/x86_64/libncore.so
+        cp target/aarch64-linux-android/release/ncore manager/app/src/main/jniLibs/arm64-v8a/libncore.so
+        cp target/x86_64-linux-android/release/ncore manager/app/src/main/jniLibs/x86_64/libncore.so
           
     - name: Decode Release Keystore
       run: |
