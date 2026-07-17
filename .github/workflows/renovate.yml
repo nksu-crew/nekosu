@@ -12,7 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: renovatebot/github-action@v43
+      - name: Renovate Bot GitHub Action
+        uses: renovatebot/github-action@v46.1.19
         with:
           configurationFile: renovate.json
         env:
