@@ -15,6 +15,7 @@ on:
 
 jobs:
   build-kernelsu-ko:
+    runs-on: ubuntu-latest
     name: Build kernelsu.ko for ${{ inputs.kmi }}
     container:
       image: ghcr.io/ylarod/ddk:${{ inputs.kmi }}-${{ inputs.ddk_release }}
