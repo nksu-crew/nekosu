@@ -45,13 +45,18 @@ jobs:
     - name: Install cargo-ndk
       run: cargo install cargo-ndk
 
-    - name: Build Rust library
+    - name: Build Rust CLI
       run: |
         cargo ndk \
           -t arm64-v8a \
           -t x86_64 \
-          -o manager/app/src/main/jniLibs \
-          build --release --bin libncore.so
+          -o /tmp/ndk-out \
+          build --release -p cli
+
+        mkdir -p manager/app/src/main/jniLibs/arm64-v8a
+        mkdir -p manager/app/src/main/jniLibs/x86_64
+        cp /tmp/ndk-out/arm64-v8a/cli manager/app/src/main/jniLibs/arm64-v8a/libncore.so
+        cp /tmp/ndk-out/x86_64/cli manager/app/src/main/jniLibs/x86_64/libncore.so
           
     - name: Decode Release Keystore
       run: |
