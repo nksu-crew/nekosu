@@ -32,6 +32,13 @@ android {
                 minorApiLevel = 1
             }
     }
+    
+    ndk {
+        abiFilters += listOf(
+            "arm64-v8a",
+            "x86_64"
+        )
+    }
 
     defaultConfig {
         applicationId = "me.nekosu.aqnya"

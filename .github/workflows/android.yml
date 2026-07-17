@@ -33,6 +33,25 @@ jobs:
         java-version: '25'
         distribution: 'temurin'
         cache: gradle
+        
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: |
+          aarch64-linux-android
+          armv7-linux-androideabi
+          x86_64-linux-android
+
+    - name: Install cargo-ndk
+      run: cargo install cargo-ndk
+
+    - name: Build Rust library
+      run: |
+        cargo ndk \
+          -t arm64-v8a \
+          -t x86_64 \
+          -o manager/app/src/main/assets \
+          build --release
           
     - name: Decode Release Keystore
       run: |
