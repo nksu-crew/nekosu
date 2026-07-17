@@ -39,24 +39,34 @@ jobs:
       with:
         targets: |
           aarch64-linux-android
-          armv7-linux-androideabi
           x86_64-linux-android
 
-    - name: Install cargo-ndk
-      run: cargo install cargo-ndk
-
-    - name: Build Rust CLI
+    - name: Build Rust CLI (cross-compile manually)
+      env:
+        API_LEVEL: 29
       run: |
-        cargo ndk \
-          -t arm64-v8a \
-          -t x86_64 \
-          -o /tmp/ndk-out \
-          build --release -p cli
+        NDK_TOOLCHAIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+        echo "$NDK_TOOLCHAIN" >> "$GITHUB_PATH"
+
+        # aarch64
+        export CC_aarch64_linux_android="${NDK_TOOLCHAIN}/aarch64-linux-android${API_LEVEL}-clang"
+        export CXX_aarch64_linux_android="${NDK_TOOLCHAIN}/aarch64-linux-android${API_LEVEL}-clang++"
+        export AR_aarch64_linux_android="${NDK_TOOLCHAIN}/llvm-ar"
+        export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="${CC_aarch64_linux_android}"
+
+        # x86_64
+        export CC_x86_64_linux_android="${NDK_TOOLCHAIN}/x86_64-linux-android${API_LEVEL}-clang"
+        export CXX_x86_64_linux_android="${NDK_TOOLCHAIN}/x86_64-linux-android${API_LEVEL}-clang++"
+        export AR_x86_64_linux_android="${NDK_TOOLCHAIN}/llvm-ar"
+        export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="${CC_x86_64_linux_android}"
+
+        cargo build --release --target aarch64-linux-android
+        cargo build --release --target x86_64-linux-android
 
         mkdir -p manager/app/src/main/jniLibs/arm64-v8a
         mkdir -p manager/app/src/main/jniLibs/x86_64
-        cp /tmp/ndk-out/arm64-v8a/cli manager/app/src/main/jniLibs/arm64-v8a/libncore.so
-        cp /tmp/ndk-out/x86_64/cli manager/app/src/main/jniLibs/x86_64/libncore.so
+        cp target/aarch64-linux-android/release/cli manager/app/src/main/jniLibs/arm64-v8a/libncore.so
+        cp target/x86_64-linux-android/release/cli manager/app/src/main/jniLibs/x86_64/libncore.so
           
     - name: Decode Release Keystore
       run: |
