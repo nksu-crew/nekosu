@@ -18,3 +18,4 @@ jobs:
           configurationFile: renovate.json
         env:
           RENOVATE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RENOVATE_REPOSITORIES: nksu-crew/nekosu
