@@ -1,0 +1,8 @@
+[package]
+name = "kmod"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+goblin = "0.10.7"
+rustix = { version = "1.1.4", features = ["system"] }

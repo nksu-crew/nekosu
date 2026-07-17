@@ -1,0 +1,14 @@
+[package]
+name = "boot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+cpio = "0.4.1"
+flate2 = "1.1.9"
+lz4_flex = "0.13.1"
+zerocopy = { version = "0.8.52", features = ["derive"] }
+
+[build-dependencies]
+bindgen = "0.72.1"

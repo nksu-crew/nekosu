@@ -1,0 +1,9 @@
+[package]
+name = "modules"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+log = "0.4.32"
+serde_json = "1.0.150"
