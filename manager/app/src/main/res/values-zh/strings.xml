@@ -224,7 +224,7 @@
     <string name="status_card_click_to_install">点击安装</string>
     <string name="animation_type_title">动画类型</string>
 <string name="animation_speed_title">动画速度</string>
-<string name="about_card_description">了解 sayasu 更多功能及使用方法</string>
-<string name="about_card_title">了解 sayasu</string>
+<string name="about_card_description">了解 nekosu 更多功能及使用方法</string>
+<string name="about_card_title">了解 nekosu</string>
 <string name="finger_print">指纹</string>
 </resources>
