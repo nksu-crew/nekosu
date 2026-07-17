@@ -28,8 +28,8 @@ add_custom_target(embed_ko ALL
 
 add_executable(init
     init.c
-    kmod/kmod.c
-    kmod/hashtable.c
+    kmod.c
+    hashtable.c
     ${CMAKE_BINARY_DIR}/nksu_ko.o
 )
 
