@@ -46,6 +46,7 @@ jobs:
         API_LEVEL: 29
       run: |
         NDK_TOOLCHAIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+        NDK_SYSROOT="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
         echo "$NDK_TOOLCHAIN" >> "$GITHUB_PATH"
 
         # aarch64
@@ -53,12 +54,14 @@ jobs:
         export CXX_aarch64_linux_android="${NDK_TOOLCHAIN}/aarch64-linux-android${API_LEVEL}-clang++"
         export AR_aarch64_linux_android="${NDK_TOOLCHAIN}/llvm-ar"
         export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="${CC_aarch64_linux_android}"
+        export BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android="--sysroot=${NDK_SYSROOT} --target=aarch64-linux-android${API_LEVEL}"
 
         # x86_64
         export CC_x86_64_linux_android="${NDK_TOOLCHAIN}/x86_64-linux-android${API_LEVEL}-clang"
         export CXX_x86_64_linux_android="${NDK_TOOLCHAIN}/x86_64-linux-android${API_LEVEL}-clang++"
         export AR_x86_64_linux_android="${NDK_TOOLCHAIN}/llvm-ar"
         export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="${CC_x86_64_linux_android}"
+        export BINDGEN_EXTRA_CLANG_ARGS_x86_64_linux_android="--sysroot=${NDK_SYSROOT} --target=x86_64-linux-android${API_LEVEL}"
 
         cargo build --release --target aarch64-linux-android
         cargo build --release --target x86_64-linux-android
