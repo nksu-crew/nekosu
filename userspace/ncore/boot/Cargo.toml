@@ -7,7 +7,7 @@ edition = "2024"
 anyhow.workspace = true
 cpio = "0.4.1"
 flate2 = "1.1.9"
-lz4_flex = "0.13.1"
+lz4_flex = "0.14.0"
 zerocopy = { version = "0.8.52", features = ["derive"] }
 
 [build-dependencies]
