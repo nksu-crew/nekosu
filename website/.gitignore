@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# VuePress v2 cache & temp
+docs/.vuepress/.cache/
+docs/.vuepress/.temp/
+
+# VuePress build output（如果不想提交静态文件）
+docs/.vuepress/dist/
+
+# Functions / serverless build artifacts
+functions/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
