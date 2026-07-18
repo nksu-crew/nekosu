@@ -338,7 +338,7 @@ static int registerNativeMethods(JNIEnv *env)
     if ((*env)->RegisterNatives(env, clazz, gMethods,
                                 sizeof(gMethods) / sizeof(gMethods[0])) < 0) {
         LOG_ERR("RegisterNatives failed");
-        return -1;
+        abort();
     }
 
     return 0;
