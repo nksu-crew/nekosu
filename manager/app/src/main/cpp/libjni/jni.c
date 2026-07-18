@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <android/log.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <sys/utsname.h>
 #include "ctl.h"
 
 #define LOG_TAG "ncore"
@@ -238,6 +241,75 @@ static void ncore_helloLog(JNIEnv *env, jobject thiz)
     LOG_INFO("ncore build-as lib (C version)");
 }
 
+static int parse_gki_info(char *out_version, size_t out_size)
+{
+    struct utsname uts;
+    const char *release, *p, *tag;
+    int major = -1, minor = -1;
+    int is_gki = 0;
+
+    if (out_version && out_size > 0)
+        out_version[0] = '\0';
+
+    if (uname(&uts) != 0) {
+        LOG_ERR("uname failed");
+        return -1;
+    }
+
+    release = uts.release; /* e.g. "5.10.198-android12-9-g1234567" */
+
+    p = release;
+    major = (int)strtol(p, (char **)&p, 10);
+    if (*p == '.') {
+        p++;
+        minor = (int)strtol(p, (char **)&p, 10);
+    }
+
+    if (major < 0 || minor < 0) {
+        LOG_ERR("failed to parse kernel version: %s", release);
+        return -1;
+    }
+
+    tag = strstr(release, "-android");
+    if (tag) {
+        const char *q = tag + strlen("-android");
+        if (isdigit((unsigned char)*q)) {
+            while (isdigit((unsigned char)*q)) q++;
+            if (*q == '-') {
+                q++;
+                if (isdigit((unsigned char)*q))
+                    is_gki = 1;
+            }
+        }
+    }
+
+    if (out_version && out_size > 0)
+        snprintf(out_version, out_size, "%d.%02d", major, minor);
+
+    LOG_INFO("kernel release=%s parsed_version=%d.%02d is_gki=%d",
+             release, major, minor, is_gki);
+
+    return is_gki;
+}
+
+static jboolean ncore_isGki(JNIEnv *env, jobject thiz)
+{
+    (void)env; (void)thiz;
+    int ret = parse_gki_info(NULL, 0);
+    return (ret == 1) ? JNI_TRUE : JNI_FALSE;
+}
+
+static jstring ncore_kernelVersion(JNIEnv *env, jobject thiz)
+{
+    (void)thiz;
+    char ver[16];
+    int ret = parse_gki_info(ver, sizeof(ver));
+    if (ret < 0) {
+        return NULL;
+    }
+    return (*env)->NewStringUTF(env, ver);
+}
+
 static const JNINativeMethod gMethods[] = {
     { "ctl",              "(I)I",                    (void *)ncore_ctl },
     { "setProfile",       "(IJLjava/lang/String;I)I",(void *)ncore_setProfile },
@@ -251,6 +323,8 @@ static const JNINativeMethod gMethods[] = {
     { "addRule",          "(Ljava/lang/String;J)I",  (void *)ncore_addRule },
     { "delRule",          "(Ljava/lang/String;)I",   (void *)ncore_delRule },
     { "helloLog",         "()V",                     (void *)ncore_helloLog },
+    { "isGki",             "()Z",                      (void *)ncore_isGki },
+    { "kernelVersion",      "()Ljava/lang/String;",     (void *)ncore_kernelVersion },
 };
 
 static int registerNativeMethods(JNIEnv *env)
