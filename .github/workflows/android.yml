@@ -76,7 +76,7 @@ jobs:
         echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > manager/release.keystore
         
     - name: Cache OMVLL
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: manager/app/src/main/lib/omvll-ndk.so
         key: omvll-linux-latest
