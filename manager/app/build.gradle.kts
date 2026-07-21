@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+val omvllFile = file("src/main/lib/omvll-ndk.so")
+
 fun gitCommitCount(): Int =
     ProcessBuilder("git", "rev-list", "--count", "HEAD")
         .directory(rootDir)
@@ -45,16 +47,21 @@ android {
         ndk {
         abiFilters += listOf(
             "arm64-v8a",
-            "x86_64"
         )
      }
     }
     
     externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-        }
-     }
+    cmake {
+        path = file("src/main/cpp/CMakeLists.txt")
+        cppFlags += listOf(
+            "-fpass-plugin=${omvllFile.absolutePath}"
+        )
+        cFlags += listOf(
+            "-fpass-plugin=${omvllFile.absolutePath}"
+        )
+      }
+    }
 
     signingConfigs {
         create("debugKey") {

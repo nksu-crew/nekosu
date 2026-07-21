@@ -74,6 +74,44 @@ jobs:
     - name: Decode Release Keystore
       run: |
         echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > manager/release.keystore
+        
+    - name: Cache OMVLL
+      uses: actions/cache@v4
+      with:
+        path: manager/app/src/main/lib/omvll-ndk.so
+        key: omvll-linux-latest
+        
+    - name: Download OMVLL
+      run: |
+        mkdir -p manager/app/src/main/lib
+
+        echo "Fetching latest OMVLL release..."
+
+        URL=$(curl -s \
+          https://api.github.com/repos/open-obfuscator/o-mvll/releases/latest \
+          | jq -r '.assets[]
+            | select(.name | contains("linux"))
+            | select(.name | endswith(".tar.gz"))
+            | .browser_download_url' \
+          | head -n 1)
+
+        echo "Downloading:"
+        echo "$URL"
+
+        curl -L "$URL" \
+          -o /tmp/omvll.tar.gz
+
+        mkdir -p /tmp/omvll
+
+        tar -xzf /tmp/omvll.tar.gz \
+          -C /tmp/omvll
+
+        find /tmp/omvll -name "omvll-ndk.so"
+
+        cp "$(find /tmp/omvll -name 'omvll-ndk.so' | head -n 1)" \
+          manager/app/src/main/lib/omvll-ndk.so
+
+        ls -lh manager/app/src/main/lib/omvll-ndk.so
 
     - name: Build with Gradle
       working-directory: manager
