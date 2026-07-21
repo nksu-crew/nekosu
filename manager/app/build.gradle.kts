@@ -48,14 +48,19 @@ android {
         abiFilters += listOf(
             "arm64-v8a",
         )
-     }
+    }
+
+    externalNativeBuild {
+        cmake {
+            cppFlags += "-fpass-plugin=${omvllFile.absolutePath}"
+            cFlags += "-fpass-plugin=${omvllFile.absolutePath}"
+        }
+    }
     }
     
     externalNativeBuild {
     cmake {
         path = file("src/main/cpp/CMakeLists.txt")
-        cppFlags("-fpass-plugin=${omvllFile.absolutePath}")
-        cFlags("-fpass-plugin=${omvllFile.absolutePath}")
       }
     }
 
