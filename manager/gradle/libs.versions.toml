@@ -15,7 +15,7 @@ okhttp = "5.4.0"
 datastore = "1.2.1"
 ktlint = "14.2.0"
 haze = "1.7.2"
-tinker = "1.9.15"
+tinker = "1.9.15.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
