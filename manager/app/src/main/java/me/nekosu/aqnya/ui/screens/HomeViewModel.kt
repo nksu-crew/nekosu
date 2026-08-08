@@ -12,7 +12,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.nekosu.aqnya.ncore
 import me.nekosu.aqnya.util.RootDbHelper
-import me.nekosu.aqnya.util.RuleDbHelper
 import me.nekosu.aqnya.util.getAppVersion
 
 class HomeViewModel(
@@ -24,15 +23,11 @@ class HomeViewModel(
     private val _suCount = MutableStateFlow(0)
     val suCount: StateFlow<Int> = _suCount
 
-    private val _ruleCount = MutableStateFlow(0)
-    val ruleCount: StateFlow<Int> = _ruleCount
-
     private val _managerVersion = MutableStateFlow("")
     val managerVersion: StateFlow<String> = _managerVersion
 
     private val appContext = app.applicationContext
     private val rootDbHelper = RootDbHelper(appContext)
-    private val ruleDbHelper = RuleDbHelper(appContext)
 
     init {
         viewModelScope.launch {
@@ -51,7 +46,6 @@ class HomeViewModel(
             withContext(Dispatchers.IO) {
                 ncore.ctl(3)
                 _suCount.value = rootDbHelper.getAllowedCount()
-                _ruleCount.value = ruleDbHelper.getCount()
             }
         }
     }
@@ -59,7 +53,6 @@ class HomeViewModel(
     override fun onCleared() {
         super.onCleared()
         rootDbHelper.close()
-        ruleDbHelper.close()
     }
 }
 

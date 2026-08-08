@@ -148,16 +148,6 @@ fun MainScreen() {
         }
     }
 
-    // 规则页被隐藏时，如果用户正停在规则页，自动退回首页
-    LaunchedEffect(showRules) {
-        if (!showRules && currentRoute == BottomNavItem.FmacRules.route) {
-            navController.navigate(BottomNavItem.Home.route) {
-                popUpTo(BottomNavItem.Home.route) { inclusive = true }
-                launchSingleTop = true
-            }
-        }
-    }
-
     val onTabClick: (Int) -> Unit = { index ->
         val target = navItems.getOrNull(index)?.route
         if (target != null && target != currentRoute) {
@@ -221,9 +211,6 @@ fun MainScreen() {
                         onNavigateToApps = {
                             onTabClick(navItems.indexOfFirst { it is BottomNavItem.History })
                         },
-                        onNavigateToRules = {
-                            onTabClick(navItems.indexOfFirst { it is BottomNavItem.FmacRules })
-                        },
                     )
                 }
 
@@ -236,14 +223,6 @@ fun MainScreen() {
                         navController = navController,
                         extraBottomPadding = 12.dp,
                     )
-                }
-
-                composable(
-                    route = BottomNavItem.FmacRules.route,
-                    enterTransition = tabTransitionEnter(navItems),
-                    exitTransition = tabTransitionExit(navItems),
-                ) {
-                    RulesScreen()
                 }
 
                 composable(
@@ -268,14 +247,6 @@ fun MainScreen() {
                     exitTransition = { PageTransitions.defaultExit },
                 ) {
                     OpenSourceScreen(navController)
-                }
-
-                composable(
-                    route = "debug_settings",
-                    enterTransition = { PageTransitions.defaultEnter },
-                    exitTransition = { PageTransitions.defaultExit },
-                ) {
-                    DebugSettingsScreen(navController)
                 }
 
                 composable("app_detail/{packageName}") { backStackEntry ->

@@ -165,7 +165,6 @@ fun SettingsScreen(navController: NavController) {
             // ── 工具 ──
             ToolsSection(
                 onExportLog = { LogUtils.exportLogs(mContext) },
-                onDebugClick = { navController.navigate("debug_settings") },
             )
 
             // ── 关于 ──

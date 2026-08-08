@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper
 
 class RootDbHelper(
     context: Context,
-) : SQLiteOpenHelper(context, "root_manager.db", null, 1) {
+) : SQLiteOpenHelper(context, "db", null, 1) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE root_apps (packageName TEXT PRIMARY KEY, allowed INTEGER)")
     }
@@ -65,72 +65,6 @@ class RootDbHelper(
             ).use { c ->
                 c.moveToFirst()
             }
-
-    override fun close() = super.close()
-}
-
-data class FmacRule(
-    val path: String,
-    val statusBits: Long,
-)
-
-const val FMAC_BIT_DENY = 0
-const val FMAC_BIT_NOT_FOUND = 1
-
-class RuleDbHelper(
-    context: Context,
-) : SQLiteOpenHelper(context, "fmac_rules.db", null, 1) {
-    override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL(
-            "CREATE TABLE rules (path TEXT PRIMARY KEY, status_bits INTEGER NOT NULL)",
-        )
-    }
-
-    override fun onUpgrade(
-        db: SQLiteDatabase,
-        old: Int,
-        new: Int,
-    ) {
-        db.execSQL("DROP TABLE IF EXISTS rules")
-        onCreate(db)
-    }
-
-    fun getAll(): List<FmacRule> {
-        val list = mutableListOf<FmacRule>()
-        readableDatabase
-            .rawQuery(
-                "SELECT path, status_bits FROM rules",
-                null,
-            ).use { c ->
-                while (c.moveToNext()) {
-                    list += FmacRule(c.getString(0), c.getLong(1))
-                }
-            }
-        return list
-    }
-
-    fun getCount(): Int =
-        readableDatabase
-            .rawQuery("SELECT COUNT(*) FROM rules", null)
-            .use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
-
-    fun insert(rule: FmacRule) {
-        val cv =
-            ContentValues().apply {
-                put("path", rule.path)
-                put("status_bits", rule.statusBits)
-            }
-        writableDatabase.insertWithOnConflict(
-            "rules",
-            null,
-            cv,
-            SQLiteDatabase.CONFLICT_REPLACE,
-        )
-    }
-
-    fun delete(path: String) {
-        writableDatabase.delete("rules", "path = ?", arrayOf(path))
-    }
 
     override fun close() = super.close()
 }

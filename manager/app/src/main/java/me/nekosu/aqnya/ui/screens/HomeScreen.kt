@@ -72,11 +72,8 @@ fun HomeScreenContent(
     installStatus: InstallStatus,
     isGki: Boolean,
     suCount: Int,
-    ruleCount: Int,
-    showRules: Boolean,
     managerVersion: String,
     onNavigateToApps: () -> Unit,
-    onNavigateToRules: () -> Unit,
     onInstallClick: () -> Unit,
     onAboutClick: () -> Unit = {},
 ) {
@@ -115,7 +112,7 @@ fun HomeScreenContent(
                 customBadgeText = if (isGki) "GKI" else "LKM",
             )
 
-            if (installStatus == InstallStatus.INSTALLED || showRules) {
+            if (installStatus == InstallStatus.INSTALLED) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -126,13 +123,6 @@ fun HomeScreenContent(
                         modifier = Modifier.weight(1f),
                         bgIcon = Icons.Filled.Numbers,
                         onClick = onNavigateToApps,
-                    )
-                    StatCard(
-                        label = stringResource(R.string.fmac_rules),
-                        value = ruleCount.toString(),
-                        modifier = Modifier.weight(1f),
-                        bgIcon = Icons.AutoMirrored.Filled.Rule,
-                        onClick = onNavigateToRules,
                     )
                 }
             }
@@ -148,16 +138,13 @@ fun HomeScreenContent(
 fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToApps: () -> Unit = {},
-    onNavigateToRules: () -> Unit = {},
     onAboutClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var showInstallSheet by remember { mutableStateOf(false) }
-    val showRules by DebugPreferences.showRulesFlow(context).collectAsState(initial = false)
 
     val installStatus by viewModel.installStatus.collectAsState()
     val suCount by viewModel.suCount.collectAsState()
-    val ruleCount by viewModel.ruleCount.collectAsState()
     val managerVersion by viewModel.managerVersion.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -173,11 +160,8 @@ fun HomeScreen(
         installStatus = installStatus,
         isGki = false, // TODO: detect is gki or lkm install.
         suCount = suCount,
-        ruleCount = ruleCount,
-        showRules = showRules,
         managerVersion = managerVersion,
         onNavigateToApps = onNavigateToApps,
-        onNavigateToRules = onNavigateToRules,
         onInstallClick = {
             if (installStatus != InstallStatus.INSTALLED) {
                 Toast.makeText(context, "即将上线... From Aqnya", Toast.LENGTH_SHORT).show()
@@ -389,11 +373,8 @@ fun HomeScreenPreviewInstalled() {
             installStatus = InstallStatus.INSTALLED,
             isGki = true,
             suCount = 0,
-            ruleCount = 0,
-            showRules = true,
             managerVersion = "1.0.0",
             onNavigateToApps = {},
-            onNavigateToRules = {},
             onInstallClick = {},
             onAboutClick = {},
         )
@@ -408,11 +389,8 @@ fun HomeScreenPreviewNotInstalled() {
             installStatus = InstallStatus.NOT_INSTALLED,
             isGki = false,
             suCount = 0,
-            ruleCount = 0,
-            showRules = true,
             managerVersion = "1.0.0",
             onNavigateToApps = {},
-            onNavigateToRules = {},
             onInstallClick = {},
             onAboutClick = {},
         )

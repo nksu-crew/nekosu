@@ -12,6 +12,7 @@ class Application : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        HotFix.loadPatch(this)
         CrashHandler.init(this)
         ncore_loader.init()
     }
