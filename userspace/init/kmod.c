@@ -144,28 +144,13 @@ static int load_module(const void *image, size_t size)
     return 0;
 }
 
-static int patch_and_load(const char *path, const HashTable *ksyms)
+static int patch_and_load(const void *data, size_t fsz, const HashTable *ksyms)
 {
-    FILE *fp = fopen(path, "rb");
-    if (!fp) {
-        fprintf(stderr, "open %s: %s\n", path, strerror(errno));
-        return -errno;
-    }
-    fseek(fp, 0, SEEK_END);
-    long fsz = ftell(fp);
-    rewind(fp);
-
-    uint8_t *image = malloc((size_t)fsz);
-    if (!image) {
-        fclose(fp);
+    /* 传入的 image 可能位于只读段，符号修补需要可写副本 */
+    uint8_t *image = malloc(fsz);
+    if (!image)
         return -ENOMEM;
-    }
-    if ((long)fread(image, 1, (size_t)fsz, fp) != fsz) {
-        fclose(fp);
-        free(image);
-        return -EIO;
-    }
-    fclose(fp);
+    memcpy(image, data, fsz);
 
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)image;
     if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0) {
@@ -264,7 +249,7 @@ out:
     return rc;
 }
 
-int kmod_load(const char *path)
+int kmod_load_many(const struct ko_image *images, size_t count, size_t preferred)
 {
     HashTable *ksyms = ht_create(262144);
     if (!ksyms) {
@@ -279,8 +264,30 @@ int kmod_load(const char *path)
         return rc;
     }
 
-    rc = patch_and_load(path, ksyms);
+    int last_rc = 0;
+    /* preferred 优先，失败后按序遍历其余 */
+    for (size_t i = 0; i < count; i++) {
+        size_t idx;
+        if (i == 0 && preferred < count)
+            idx = preferred;
+        else if (i == 0)
+            idx = 0;
+        else if (preferred < count && i <= preferred)
+            idx = i - 1;
+        else
+            idx = i;
+
+        fprintf(stderr, "loading %s\n", images[idx].kmi);
+        rc = patch_and_load(images[idx].start,
+                            (size_t)(images[idx].end - images[idx].start), ksyms);
+        if (rc == 0) {
+            fprintf(stderr, "loaded %s\n", images[idx].kmi);
+            break;
+        }
+        fprintf(stderr, "failed to load %s: %s\n", images[idx].kmi, strerror(-rc));
+        last_rc = rc;
+    }
 
     ht_free(ksyms);
-    return rc;
+    return rc == 0 ? 0 : last_rc;
 }

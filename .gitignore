@@ -12,3 +12,4 @@ release.keystore
 ktlint
 app/src/main/jniLibs/
 .kotlin/
+userspace/init/ko/

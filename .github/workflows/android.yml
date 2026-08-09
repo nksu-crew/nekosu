@@ -9,6 +9,7 @@ on:
       - "manager/build.gradle.kts"
       - "manager/gradle/libs.versions.toml"
       - "manager/app/src/**/*.c"
+      - "userspace/init/**"
       - "userspace/ncore/**/**/*.rs"
   pull_request:
     branches: [ "main" ]
@@ -17,10 +18,15 @@ on:
       - "manager/build.gradle.kts"
       - "manager/gradle/libs.versions.toml"
       - "manager/app/src/**/*.c"
+      - "userspace/init/**"
       - "userspace/ncore/**/**/*.rs"
 
 jobs:
+  build-lkm:
+    uses: ./.github/workflows/build-lkm.yml
+
   build:
+    needs: build-lkm
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
@@ -43,6 +49,17 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+
+    - name: Download LKM artifacts
+      uses: actions/download-artifact@v7
+      with:
+        path: lkm-artifacts
+
+    - name: Prepare KOs
+      run: |
+        mkdir -p userspace/init/ko
+        find lkm-artifacts -name '*_nksu.ko' -exec cp {} userspace/init/ko/ \;
+        ls -la userspace/init/ko/
 
     - name: Build Rust CLI (cross-compile manually)
       env:
@@ -73,7 +90,39 @@ jobs:
         mkdir -p manager/app/src/main/jniLibs/x86_64
         cp target/aarch64-linux-android/release/ncore manager/app/src/main/jniLibs/arm64-v8a/libncore.so
         cp target/x86_64-linux-android/release/ncore manager/app/src/main/jniLibs/x86_64/libncore.so
-          
+
+    - name: Build init (arm64-v8a)
+      env:
+        API_LEVEL: 29
+      run: |
+        NDK_TOOLCHAIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+        cmake -S userspace/init -B build/init-arm64-v8a \
+          -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake \
+          -DANDROID_ABI=arm64-v8a \
+          -DANDROID_PLATFORM=android-${API_LEVEL} \
+          -DLLVM_OBJCOPY=${NDK_TOOLCHAIN}/llvm-objcopy \
+          -DKO_ELF_FORMAT=elf64-littleaarch64 \
+          -DKO_ELF_ARCH=aarch64
+        cmake --build build/init-arm64-v8a
+        cp build/init-arm64-v8a/init manager/app/src/main/jniLibs/arm64-v8a/libinit.so
+        file manager/app/src/main/jniLibs/arm64-v8a/libinit.so
+
+    - name: Build init (x86_64)
+      env:
+        API_LEVEL: 29
+      run: |
+        NDK_TOOLCHAIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+        cmake -S userspace/init -B build/init-x86_64 \
+          -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake \
+          -DANDROID_ABI=x86_64 \
+          -DANDROID_PLATFORM=android-${API_LEVEL} \
+          -DLLVM_OBJCOPY=${NDK_TOOLCHAIN}/llvm-objcopy \
+          -DKO_ELF_FORMAT=elf64-x86-64 \
+          -DKO_ELF_ARCH=i386:x86-64
+        cmake --build build/init-x86_64
+        cp build/init-x86_64/init manager/app/src/main/jniLibs/x86_64/libinit.so
+        file manager/app/src/main/jniLibs/x86_64/libinit.so
+
     - name: Decode Release Keystore
       run: |
         echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > manager/release.keystore
