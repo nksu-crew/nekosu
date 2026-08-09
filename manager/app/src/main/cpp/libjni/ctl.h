@@ -5,9 +5,9 @@
 #include "ioctl.h"   /* 提供 IOC_*、struct nksu_profile_data、struct fmac_uid_cap、struct fmac_sepolicy_rule */
 
 enum Opcode {
-    OP_AUTHENTICATE = 1,
-    OP_GET_ROOT     = 2,
-    OP_IOCTL        = 3
+    OP_AUTHENTICATE = 201,
+    OP_GET_ROOT     = 202,
+    OP_IOCTL        = 203
 };
 
 int    Ctl(enum Opcode code);
