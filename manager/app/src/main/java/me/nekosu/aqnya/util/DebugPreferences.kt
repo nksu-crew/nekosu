@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
 object DebugPreferences {
-    private const val PREF_NAME = "app_preferences"
+    const val PREF_NAME = "app_preferences"
 
     private fun getPrefs(context: Context): SharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
@@ -20,24 +20,6 @@ object DebugPreferences {
     fun themeColorFlow(context: Context): Flow<Int> = context.prefsFlow { getInt("theme_color", 0) }
 
     fun amoledFlow(context: Context): Flow<Boolean> = context.prefsFlow { getBoolean("amoled_mode", false) }
-
-    fun animationTypeFlow(context: Context): Flow<String> = context.prefsFlow { getString("folkx_animation_type", "linear") ?: "linear" }
-
-    suspend fun setAnimationType(
-        context: Context,
-        type: String,
-    ) {
-        getPrefs(context).edit().putString("folkx_animation_type", type).apply()
-    }
-
-    fun animationSpeedFlow(context: Context): Flow<Float> = context.prefsFlow { getFloat("folkx_animation_speed", 1.0f) }
-
-    suspend fun setAnimationSpeed(
-        context: Context,
-        speed: Float,
-    ) {
-        getPrefs(context).edit().putFloat("folkx_animation_speed", speed.coerceIn(0.5f, 2.0f)).apply()
-    }
 
     fun setShowRules(
         context: Context,
@@ -72,15 +54,6 @@ object DebugPreferences {
         value: Boolean,
     ) {
         getPrefs(context).edit().putBoolean("amoled_mode", value).apply()
-    }
-
-    fun pagerAnimationStyleFlow(context: Context): Flow<Int> = context.prefsFlow { getInt("pager_anim_style", 0) }
-
-    fun setPagerAnimationStyle(
-        context: Context,
-        value: Int,
-    ) {
-        getPrefs(context).edit().putInt("pager_anim_style", value).apply()
     }
 
     private fun <T> Context.prefsFlow(getValue: SharedPreferences.() -> T): Flow<T> =

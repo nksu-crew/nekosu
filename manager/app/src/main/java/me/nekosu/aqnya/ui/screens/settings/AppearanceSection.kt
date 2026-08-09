@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -38,29 +37,25 @@ import me.nekosu.aqnya.ui.component.ListRow
 import me.nekosu.aqnya.ui.screens.enums.ThemeColor
 import me.nekosu.aqnya.ui.screens.enums.ThemeMode
 import me.nekosu.aqnya.util.NavBarStyle
-import me.nekosu.aqnya.util.PagerAnimationStyle
 
 @Composable
 fun AppearanceSection(
     currentThemeMode: ThemeMode,
     currentNavBarStyle: NavBarStyle,
-    currentPagerAnimStyle: PagerAnimationStyle,
     currentThemeColor: ThemeColor,
     amoledEnabled: Boolean,
     onThemeChange: (ThemeMode) -> Unit,
     onNavBarStyleChange: (NavBarStyle) -> Unit,
-    onPagerAnimationChange: (PagerAnimationStyle) -> Unit,
     onThemeColorChange: (ThemeColor) -> Unit,
     onAmoledChange: (Boolean) -> Unit,
 ) {
     var themeMenuExpanded by remember { mutableStateOf(false) }
     var themeColorMenuExpanded by remember { mutableStateOf(false) }
     var navBarStyleMenuExpanded by remember { mutableStateOf(false) }
-    var pagerAnimMenuExpanded by remember { mutableStateOf(false) }
 
     CardGroup {
         // 主题模式
-        CardItem(index = 0, total = 5) {
+        CardItem(index = 0, total = 4) {
             ListItem(
                 modifier = Modifier.fillMaxWidth().clickable { themeMenuExpanded = true },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -104,7 +99,7 @@ fun AppearanceSection(
         }
 
         // 主题色
-        CardItem(index = 1, total = 5) {
+        CardItem(index = 1, total = 4) {
             ListItem(
                 modifier = Modifier.fillMaxWidth().clickable { themeColorMenuExpanded = true },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -153,7 +148,7 @@ fun AppearanceSection(
         }
 
         // AMOLED 纯黑
-        CardItem(index = 2, total = 5) {
+        CardItem(index = 2, total = 4) {
             ListRow(
                 modifier = Modifier.toggleable(value = amoledEnabled, role = Role.Switch, onValueChange = onAmoledChange),
                 icon = { Icon(Icons.Outlined.PhoneAndroid, contentDescription = null) },
@@ -168,7 +163,7 @@ fun AppearanceSection(
         }
 
         // 导航栏样式
-        CardItem(index = 3, total = 5) {
+        CardItem(index = 3, total = 4) {
             ListItem(
                 modifier = Modifier.fillMaxWidth().clickable { navBarStyleMenuExpanded = true },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -202,50 +197,6 @@ fun AppearanceSection(
                                     },
                                     trailingIcon = {
                                         if (currentNavBarStyle == style) {
-                                            Icon(Icons.Default.Check, null, Modifier.size(20.dp))
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                },
-            )
-        }
-
-        // 页面切换动画（Pager）
-        CardItem(index = 4, total = 5) {
-            ListItem(
-                modifier = Modifier.fillMaxWidth().clickable { pagerAnimMenuExpanded = true },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                leadingContent = { Icon(Icons.Outlined.Science, contentDescription = null) },
-                headlineContent = {
-                    Text(
-                        stringResource(R.string.pager_anim_title),
-                    )
-                },
-                supportingContent = { Text(stringResource(currentPagerAnimStyle.titleRes)) },
-                trailingContent = {
-                    Box {
-                        DropdownMenu(
-                            expanded = pagerAnimMenuExpanded,
-                            onDismissRequest = { pagerAnimMenuExpanded = false },
-                            shape = RoundedCornerShape(16.dp),
-                        ) {
-                            PagerAnimationStyle.entries.forEach { style ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(style.titleRes),
-                                            fontWeight = if (currentPagerAnimStyle == style) FontWeight.SemiBold else FontWeight.Normal,
-                                        )
-                                    },
-                                    onClick = {
-                                        pagerAnimMenuExpanded = false
-                                        onPagerAnimationChange(style)
-                                    },
-                                    trailingIcon = {
-                                        if (currentPagerAnimStyle == style) {
                                             Icon(Icons.Default.Check, null, Modifier.size(20.dp))
                                         }
                                     },

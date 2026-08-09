@@ -22,10 +22,7 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -34,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 import me.nekosu.aqnya.R
-import me.nekosu.aqnya.ui.screens.enums.AnimationType
 import me.nekosu.aqnya.ui.screens.enums.ThemeColor
 import me.nekosu.aqnya.ui.screens.enums.ThemeMode
 import me.nekosu.aqnya.ui.screens.sections.*
@@ -42,7 +38,6 @@ import me.nekosu.aqnya.util.DebugPreferences
 import me.nekosu.aqnya.util.LocaleHelper
 import me.nekosu.aqnya.util.LogUtils
 import me.nekosu.aqnya.util.NavBarStyle
-import me.nekosu.aqnya.util.PagerAnimationStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,23 +50,13 @@ fun SettingsScreen(navController: NavController) {
     val themeValue by DebugPreferences.themeModeFlow(mContext).collectAsState(initial = 0)
     val currentThemeMode = ThemeMode.fromValue(themeValue)
 
-    val navBarStyleValue by DebugPreferences.navBarStyleFlow(mContext).collectAsState(initial = 2)
+    val navBarStyleValue by DebugPreferences.navBarStyleFlow(mContext).collectAsState(initial = 0)
     val currentNavBarStyle = NavBarStyle.fromValue(navBarStyleValue)
-
-    val pagerAnimValue by DebugPreferences.pagerAnimationStyleFlow(mContext).collectAsState(initial = 0)
-    val currentPagerAnimStyle = PagerAnimationStyle.fromValue(pagerAnimValue)
 
     val themeColorValue by DebugPreferences.themeColorFlow(mContext).collectAsState(initial = 0)
     val currentThemeColor = ThemeColor.fromValue(themeColorValue)
 
     val amoledEnabled by DebugPreferences.amoledFlow(mContext).collectAsState(initial = false)
-
-    // 新增：动画引擎设置
-    val animTypeValue by DebugPreferences.animationTypeFlow(mContext).collectAsState(initial = "linear")
-    val currentAnimType = AnimationType.fromValue(animTypeValue)
-
-    val animSpeedValue by DebugPreferences.animationSpeedFlow(mContext).collectAsState(initial = 1.0f)
-    var animSpeed by remember { mutableStateOf(animSpeedValue) }
 
     val currentLang =
         LocaleHelper
@@ -129,7 +114,6 @@ fun SettingsScreen(navController: NavController) {
             AppearanceSection(
                 currentThemeMode = currentThemeMode,
                 currentNavBarStyle = currentNavBarStyle,
-                currentPagerAnimStyle = currentPagerAnimStyle,
                 currentThemeColor = currentThemeColor,
                 amoledEnabled = amoledEnabled,
                 onThemeChange = { mode ->
@@ -138,27 +122,11 @@ fun SettingsScreen(navController: NavController) {
                 onNavBarStyleChange = { style ->
                     scope.launch { DebugPreferences.setNavBarStyle(mContext, style.value) }
                 },
-                onPagerAnimationChange = { style ->
-                    scope.launch { DebugPreferences.setPagerAnimationStyle(mContext, style.value) }
-                },
                 onThemeColorChange = { color ->
                     scope.launch { DebugPreferences.setThemeColor(mContext, color.value) }
                 },
                 onAmoledChange = { enabled ->
                     scope.launch { DebugPreferences.setAmoled(mContext, enabled) }
-                },
-            )
-
-            // ── 动画引擎 ──
-            AnimationEngineSection(
-                currentAnimType = currentAnimType,
-                currentSpeed = animSpeedValue,
-                onAnimTypeChange = { type ->
-                    scope.launch { DebugPreferences.setAnimationType(mContext, type.value) }
-                },
-                onSpeedChange = { speed ->
-                    animSpeed = speed
-                    scope.launch { DebugPreferences.setAnimationSpeed(mContext, speed) }
                 },
             )
 

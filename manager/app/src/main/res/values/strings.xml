@@ -43,9 +43,6 @@
     <string name="navbar_style_title">Navigation Bar Style</string>
     <string name="navbar_style_floating">Floating</string>
     <string name="navbar_style_normal">Normal</string>
-    <string name="pager_anim_title">Page Animation</string>
-    <string name="pager_anim_default">Fast</string>
-    <string name="pager_anim_spring">Spring Physics</string>
 
     <!-- 底部导航栏 -->
     <string name="nav_home">Home</string>
@@ -228,9 +225,7 @@
     <string name="status_card_need_update">Update Required</string>
     <string name="status_card_not_installed">Not Installed</string>
     <string name="status_card_click_to_install">Tap to Install</string>
-    <string name="animation_type_title">Animation Type</string>
-<string name="animation_speed_title">Animation Speed</string>
-<string name="about_card_description">Learn more about nekosu feature and how to use</string>
+    <string name="about_card_description">Learn more about nekosu feature and how to use</string>
 <string name="about_card_title">Learn nekosu</string>
 <string name="finger_print">Fingerprint</string>
 </resources>

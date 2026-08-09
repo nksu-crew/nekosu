@@ -189,7 +189,7 @@ private fun amoledBlend(v: Int) = staticDark(v).copy(background = AmoledBlack, s
 @Composable
 fun NekosuTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("saya", android.content.Context.MODE_PRIVATE) }
+    val prefs = remember { context.getSharedPreferences(DebugPreferences.PREF_NAME, android.content.Context.MODE_PRIVATE) }
 
     val themePreference by DebugPreferences.themeModeFlow(context).collectAsState(initial = prefs.getInt("theme_mode", 0))
 
