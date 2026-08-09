@@ -41,6 +41,9 @@ jobs:
           aarch64-linux-android
           x86_64-linux-android
 
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
     - name: Build Rust CLI (cross-compile manually)
       env:
         API_LEVEL: 29
