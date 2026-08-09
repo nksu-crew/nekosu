@@ -2,7 +2,7 @@
 #define CTL_H
 
 #include <stdint.h>
-#include "ioctl.h"   /* 提供 IOC_*、struct nksu_profile_data、struct fmac_uid_cap、struct fmac_sepolicy_rule */
+#include "ioctl.h"   /* 提供 IOC_CMD、flag 枚举与 data 布局常量 */
 
 enum Opcode {
     OP_AUTHENTICATE = 201,

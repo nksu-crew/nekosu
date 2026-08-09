@@ -23,6 +23,33 @@ static void copy_to_char64(char dst[64], const char *s)
     }
 }
 
+#define FMAC_MAX_DATA FMAC_DATA_SELRULE
+
+static int ioc_call(int fd, unsigned int flag, void *data, size_t size)
+{
+    union {
+        struct fmac_ioc msg;
+        uint8_t raw[sizeof(struct fmac_ioc) + FMAC_MAX_DATA];
+    } u;
+    int ret;
+
+    if (size > FMAC_MAX_DATA) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    u.msg.flag = flag;
+    u.msg.size = (uint32_t)size;
+    if (size)
+        memcpy(u.msg.data, data, size);
+
+    ret = ioctl(fd, IOC_CMD, &u);
+    if (ret == 0 && size)
+        memcpy(data, u.msg.data, size);
+
+    return ret;
+}
+
 static int scan_fd_by_link(const char *target)
 {
     DIR *dir;
@@ -73,15 +100,15 @@ int Ctl(enum Opcode code)
 
 int SetProfile(int fd, int uid, uint64_t caps, const char *domain, int namespace)
 {
-    struct nksu_profile_data data;
-    memset(&data, 0, sizeof(data));
+    uint8_t data[FMAC_DATA_PROFILE];
+    uint32_t u = (uint32_t)uid;
 
-    data.uid       = (unsigned int)uid;
-    data.caps      = caps;
-    copy_to_char64(data.selinux_domain, domain);
-    data.namespace = (int)namespace;
+    memcpy(data + FMAC_OFF_UID, &u, sizeof(u));
+    memcpy(data + FMAC_OFF_CAPS, &caps, sizeof(caps));
+    copy_to_char64((char *)data + FMAC_OFF_DOMAIN, domain);
+    memcpy(data + FMAC_OFF_NS, &namespace, sizeof(namespace));
 
-    return ioctl(fd, IOC_SET_PROFILE, &data);
+    return ioc_call(fd, IOC_SET_PROFILE, data, sizeof(data));
 }
 
 int AddUid(int fd, int uid)
@@ -90,8 +117,8 @@ int AddUid(int fd, int uid)
         errno = EINVAL;
         return -1;
     }
-    unsigned int val = (unsigned int)uid;
-    return ioctl(fd, IOC_ADD_UID, &val);
+    uint32_t val = (uint32_t)uid;
+    return ioc_call(fd, IOC_ADD_UID, &val, sizeof(val));
 }
 
 int DelUid(int fd, int uid)
@@ -100,8 +127,8 @@ int DelUid(int fd, int uid)
         errno = EINVAL;
         return -1;
     }
-    unsigned int val = (unsigned int)uid;
-    return ioctl(fd, IOC_DEL_UID, &val);
+    uint32_t val = (uint32_t)uid;
+    return ioc_call(fd, IOC_DEL_UID, &val, sizeof(val));
 }
 
 int HasUid(int fd, int uid, int *has)
@@ -110,8 +137,8 @@ int HasUid(int fd, int uid, int *has)
         errno = EINVAL;
         return -1;
     }
-    unsigned int val = (unsigned int)uid;
-    if (ioctl(fd, IOC_HAS_UID, &val) < 0)
+    uint32_t val = (uint32_t)uid;
+    if (ioc_call(fd, IOC_HAS_UID, &val, sizeof(val)) < 0)
         return -1;
     *has = (val != 0);
     return 0;
@@ -119,53 +146,59 @@ int HasUid(int fd, int uid, int *has)
 
 int SetCap(int fd, int uid, uint64_t caps)
 {
-    struct fmac_uid_cap uc;
-    memset(&uc, 0, sizeof(uc));
-    uc.uid  = (unsigned int)uid;
-    uc.caps = caps;
-    return ioctl(fd, IOC_SET_CAP, &uc);
+    uint8_t data[FMAC_DATA_CAP];
+    uint32_t u = (uint32_t)uid;
+
+    memcpy(data + FMAC_OFF_UID, &u, sizeof(u));
+    memcpy(data + FMAC_OFF_CAPS, &caps, sizeof(caps));
+
+    return ioc_call(fd, IOC_SET_CAP, data, sizeof(data));
 }
 
 int GetCap(int fd, int uid, uint64_t *caps)
 {
+    uint8_t data[FMAC_DATA_CAP];
+    uint32_t u = (uint32_t)uid;
+
     if (!caps) {
         errno = EINVAL;
         return -1;
     }
-    struct fmac_uid_cap uc;
-    memset(&uc, 0, sizeof(uc));
-    uc.uid = (unsigned int)uid;
 
-    if (ioctl(fd, IOC_GET_CAP, &uc) < 0)
+    memcpy(data + FMAC_OFF_UID, &u, sizeof(u));
+    if (ioc_call(fd, IOC_GET_CAP, data, sizeof(data)) < 0)
         return -1;
-    *caps = uc.caps;
+    memcpy(caps, data + FMAC_OFF_CAPS, sizeof(*caps));
     return 0;
 }
 
 int DelCap(int fd, int uid)
 {
-    struct fmac_uid_cap uc;
-    memset(&uc, 0, sizeof(uc));
-    uc.uid = (unsigned int)uid;
-    return ioctl(fd, IOC_DEL_CAP, &uc);
+    uint8_t data[FMAC_DATA_CAP];
+    uint32_t u = (uint32_t)uid;
+
+    memcpy(data + FMAC_OFF_UID, &u, sizeof(u));
+    memset(data + FMAC_OFF_CAPS, 0, sizeof(uint64_t));
+
+    return ioc_call(fd, IOC_DEL_CAP, data, sizeof(data));
 }
 
 int AddSelinuxRule(int fd, const char *src, const char *tgt,
                    const char *cls, const char *perm,
                    int effect, int invert)
 {
-    struct fmac_sepolicy_rule rule;
-    memset(&rule, 0, sizeof(rule));
+    uint8_t data[FMAC_DATA_SELRULE];
+    int inv = invert ? 1 : 0;
 
-    copy_to_char64(rule.src,  src);
-    copy_to_char64(rule.tgt,  tgt);
-    copy_to_char64(rule.cls,  cls);
-    copy_to_char64(rule.perm, perm);
+    memset(data, 0, sizeof(data));
+    copy_to_char64((char *)data + FMAC_OFF_UID,  src);
+    copy_to_char64((char *)data + FMAC_OFF_TGT,  tgt);
+    copy_to_char64((char *)data + FMAC_OFF_CLS,  cls);
+    copy_to_char64((char *)data + FMAC_OFF_PERM, perm);
+    memcpy(data + FMAC_OFF_EFFECT, &effect, sizeof(effect));
+    memcpy(data + FMAC_OFF_INVERT, &inv, sizeof(inv));
 
-    rule.effect = effect;
-    rule.invert = invert ? 1 : 0;
-
-    return ioctl(fd, IOC_SEL_ADD_RULE, &rule);
+    return ioc_call(fd, IOC_SEL_ADD_RULE, data, sizeof(data));
 }
 
 int ScanDriverFd(void)
