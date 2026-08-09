@@ -58,28 +58,13 @@ static int scan_fd_by_link(const char *target)
     return -1;
 }
 
-int ioctl_cmd(int fd, unsigned long cmd, void *arg)
-{
-    if (ioctl(fd, cmd, arg) < 0)
-        return -1;
-    return 0;
-}
-
-int ctl_prctl(unsigned int op)
-{
-    unsigned long rop = (unsigned long)op + 200;
-    if (prctl(rop, 0, 0, 0, 0) < 0)
-        return -1;
-    return 0;
-}
-
 int Ctl(enum Opcode code)
 {
     switch (code) {
     case OP_AUTHENTICATE:
     case OP_GET_ROOT:
     case OP_IOCTL:
-        return ctl_prctl((unsigned int)code);
+        return prctl((unsigned int)code, 0, 0, 0, 0);
     default:
         errno = EINVAL;
         return -1;
@@ -96,7 +81,7 @@ int SetProfile(int fd, int uid, uint64_t caps, const char *domain, int namespace
     copy_to_char64(data.selinux_domain, domain);
     data.namespace = (int)namespace;
 
-    return ioctl_cmd(fd, IOC_SET_PROFILE, &data);
+    return ioctl(fd, IOC_SET_PROFILE, &data);
 }
 
 int AddUid(int fd, int uid)
@@ -106,7 +91,7 @@ int AddUid(int fd, int uid)
         return -1;
     }
     unsigned int val = (unsigned int)uid;
-    return ioctl_cmd(fd, IOC_ADD_UID, &val);
+    return ioctl(fd, IOC_ADD_UID, &val);
 }
 
 int DelUid(int fd, int uid)
@@ -116,7 +101,7 @@ int DelUid(int fd, int uid)
         return -1;
     }
     unsigned int val = (unsigned int)uid;
-    return ioctl_cmd(fd, IOC_DEL_UID, &val);
+    return ioctl(fd, IOC_DEL_UID, &val);
 }
 
 int HasUid(int fd, int uid, int *has)
@@ -126,7 +111,7 @@ int HasUid(int fd, int uid, int *has)
         return -1;
     }
     unsigned int val = (unsigned int)uid;
-    if (ioctl_cmd(fd, IOC_HAS_UID, &val) < 0)
+    if (ioctl(fd, IOC_HAS_UID, &val) < 0)
         return -1;
     *has = (val != 0);
     return 0;
@@ -138,7 +123,7 @@ int SetCap(int fd, int uid, uint64_t caps)
     memset(&uc, 0, sizeof(uc));
     uc.uid  = (unsigned int)uid;
     uc.caps = caps;
-    return ioctl_cmd(fd, IOC_SET_CAP, &uc);
+    return ioctl(fd, IOC_SET_CAP, &uc);
 }
 
 int GetCap(int fd, int uid, uint64_t *caps)
@@ -151,7 +136,7 @@ int GetCap(int fd, int uid, uint64_t *caps)
     memset(&uc, 0, sizeof(uc));
     uc.uid = (unsigned int)uid;
 
-    if (ioctl_cmd(fd, IOC_GET_CAP, &uc) < 0)
+    if (ioctl(fd, IOC_GET_CAP, &uc) < 0)
         return -1;
     *caps = uc.caps;
     return 0;
@@ -162,7 +147,7 @@ int DelCap(int fd, int uid)
     struct fmac_uid_cap uc;
     memset(&uc, 0, sizeof(uc));
     uc.uid = (unsigned int)uid;
-    return ioctl_cmd(fd, IOC_DEL_CAP, &uc);
+    return ioctl(fd, IOC_DEL_CAP, &uc);
 }
 
 int AddSelinuxRule(int fd, const char *src, const char *tgt,
@@ -180,7 +165,7 @@ int AddSelinuxRule(int fd, const char *src, const char *tgt,
     rule.effect = effect;
     rule.invert = invert ? 1 : 0;
 
-    return ioctl_cmd(fd, IOC_SEL_ADD_RULE, &rule);
+    return ioctl(fd, IOC_SEL_ADD_RULE, &rule);
 }
 
 int ScanDriverFd(void)
