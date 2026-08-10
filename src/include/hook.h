@@ -1,3 +1,6 @@
+#ifndef _HOOK_H
+#define _HOOK_H
+
 #define SU_PATH             "/system/bin/su"
 #define SU_PATH_LEN         (sizeof(SU_PATH))
 
@@ -15,3 +18,5 @@ static inline bool path_is_su(const char *p)
 
 int init_syscall_hook(void);
 void exit_syscall_hook(void);
+
+#endif
