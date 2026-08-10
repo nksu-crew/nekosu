@@ -26,6 +26,29 @@ else
 	ccflags-y += -O3
 endif
 
+ifeq ($(CONFIG_LTO_CLANG),y)
+    # Clang LTO
+    ccflags-y += -flto=thin
+    CFLAGS_nksu.o := -flto=thin
+    CFLAGS_src/privilege.o := -flto=thin
+    CFLAGS_src/ioctl.o := -flto=thin
+    CFLAGS_src/manager.o := -flto=thin -O3
+    CFLAGS_src/selinux/rule.o := -flto=thin
+    CFLAGS_src/selinux/selinux.o := -flto=thin
+    CFLAGS_src/selinux/policy.o := -flto=thin
+    CFLAGS_src/selinux/domain.o := -flto=thin
+    CFLAGS_src/profile/profile.o := -flto=thin
+    CFLAGS_src/ns.o := -flto=thin
+    CFLAGS_src/handle.o := -flto=thin -O3
+    CFLAGS_src/fd/anonfd.o := -flto=thin
+    CFLAGS_src/fd/eventfd.o := -flto=thin
+    CFLAGS_src/fd/shm_hash.o := -flto=thin
+    ifeq ($(CONFIG_NKSU_SYSCALL),y)
+        CFLAGS_src/syscall/syscall.o := -flto=thin -O3
+        CFLAGS_src/syscall/dispatch.o := -flto=thin -O3
+    endif
+endif
+
 ccflags-y += -I$(srctree)/security/selinux
 ccflags-y += -I$(srctree)/security/selinux/include
 ccflags-y += -I$(IDIR)
@@ -39,5 +62,5 @@ ccflags-y += -Wno-unused-function
 ccflags-y += -Werror=implicit-function-declaration
 ccflags-y += -Werror=return-type
 
-CFLAGS_src/manager.o  := -O3
-CFLAGS_src/handle.o   := -O3
+# CFLAGS_src/manager.o  := -O3
+# CFLAGS_src/handle.o   := -O3
