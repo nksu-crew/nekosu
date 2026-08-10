@@ -10,6 +10,7 @@
 
 #include <linux/capability.h>
 #include <linux/rcupdate.h>
+#include <linux/string.h>
 #include <linux/types.h>
 
 #define NKSU_PROFILE_MAGIC	0x4b4e5355 /* "NKSU" */
@@ -67,13 +68,23 @@ static inline size_t blob_total_size(const struct nksu_profile_blob *b)
 		+ b->arena_cap;
 }
 
+/*
+ * Transfer kernel_cap_t to/from entry storage.  We use memcpy
+ * because kernel_cap_t's internal layout varies across kernel
+ * versions (struct with cap[], plain u32, etc.).
+ */
 static inline kernel_cap_t entry_caps(const struct nksu_profile_entry *e)
 {
 	kernel_cap_t c;
 
-	c.cap[0] = e->cap_lo;
-	c.cap[1] = e->cap_hi;
+	memcpy(&c, &e->cap_lo, sizeof(c));
 	return c;
+}
+
+static inline void entry_set_caps(struct nksu_profile_entry *e,
+				  kernel_cap_t caps)
+{
+	memcpy(&e->cap_lo, &caps, sizeof(caps));
 }
 
 /* --- public API --- */

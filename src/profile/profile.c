@@ -242,8 +242,7 @@ static int __set_all(struct nksu_profile_blob **bp, void *ctx)
 
 	if (found) {
 		/* update existing */
-		entries[idx].cap_lo = s->caps.cap[0];
-		entries[idx].cap_hi = s->caps.cap[1];
+		entry_set_caps(&entries[idx], s->caps);
 		entries[idx].ns = (u16)s->ns;
 		if (domain_off >= 0) {
 			entries[idx].domain_off = (u16)domain_off;
@@ -279,8 +278,7 @@ static int __set_all(struct nksu_profile_blob **bp, void *ctx)
 		b->count++;
 
 		entries[idx].uid = s->uid;
-		entries[idx].cap_lo = s->caps.cap[0];
-		entries[idx].cap_hi = s->caps.cap[1];
+		entry_set_caps(&entries[idx], s->caps);
 		entries[idx].ns = (u16)s->ns;
 		entries[idx].domain_off = (domain_off >= 0) ? (u16)domain_off : 0xffff;
 		entries[idx].domain_len = dlen;
@@ -309,8 +307,7 @@ static int __set_caps(struct nksu_profile_blob **bp, void *ctx)
 	if (!blob_bsearch(*bp, s->uid, &idx))
 		return -ENOENT;
 
-	entries[idx].cap_lo = s->caps.cap[0];
-	entries[idx].cap_hi = s->caps.cap[1];
+	entry_set_caps(&entries[idx], s->caps);
 	return 0;
 }
 
@@ -499,7 +496,7 @@ int nksu_profile_set_ns(uid_t uid, int ns)
 
 int nksu_profile_set_default(uid_t uid)
 {
-	kernel_cap_t caps = { { 0, 0 } };
+	kernel_cap_t caps = {};
 
 	return nksu_profile_set(uid, caps, "u:r:nksu:s0", NKSU_NS_INHERITED);
 }
