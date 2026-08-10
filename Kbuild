@@ -16,8 +16,6 @@ ifeq ($(CONFIG_NKSU_SYSCALL),y)
 	nksu-y += src/syscall/dispatch.o
 	CFLAGS_src/syscall/syscall.o := -O3
 	CFLAGS_src/syscall/dispatch.o := -O3
-else
-	nksu-y += src/tracepoint.o
 endif
 
 obj-$(CONFIG_NKSU) += nksu.o
@@ -41,6 +39,5 @@ ccflags-y += -Wno-unused-function
 ccflags-y += -Werror=implicit-function-declaration
 ccflags-y += -Werror=return-type
 
-CFLAGS_src/manager.o     := -O3
-CFLAGS_src/tracepoint.o  := -O3
-CFLAGS_src/handle.o := -O3
+CFLAGS_src/manager.o  := -O3
+CFLAGS_src/handle.o   := -O3

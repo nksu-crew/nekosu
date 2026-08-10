@@ -22,7 +22,7 @@
 
 #include "klog.h"
 #include "privilege.h"
-#include "tracepoint.h"
+#include "handle.h"
 #include "ioctl.h"
 #include "manager.h"
 #include "hook.h"
