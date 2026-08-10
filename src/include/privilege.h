@@ -1,16 +1,54 @@
-#include <linux/capability.h>
-
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef PRIVILEGE_H
 #define PRIVILEGE_H
 
-#define PRIV_ROOT (1 << 0)
-#define PRIV_CAPS (1 << 1)
-#define PRIV_SELINUX (1 << 2)
-#define PRIV_SECCOMP (1 << 3)
-#define PRIV_ALL (PRIV_ROOT | PRIV_CAPS | PRIV_SELINUX | PRIV_SECCOMP)
+#include <linux/capability.h>
 
-void grant_privileges(unsigned int flags, kernel_cap_t caps_to_raise,
-		      const char *target_domain);
-void elevate_to_root(void);
+/*
+ * privilege_desc — describes the full set of privilege changes to apply.
+ *
+ * All fields are explicit; the caller decides exactly what to change.
+ * For the common case of "give me everything", use
+ * privilege_escalate_from_profile() which reads the stored profile and
+ * builds a descriptor from it.
+ */
+struct privilege_desc {
+	bool set_root_uidgid;       /* set all UIDs/GIDs to root (0) */
+	kernel_cap_t caps_to_raise; /* capabilities to add to effective/permitted/bset */
+	const char *selinux_domain; /* target SELinux domain (NULL = no change) */
+	bool disable_seccomp;       /* reset seccomp to DISABLED */
+	bool switch_to_init_ns;     /* switch to init namespace */
+};
+
+/*
+ * Validate a privilege descriptor. Returns 0 if valid, -EINVAL otherwise.
+ * Must be called before privilege_escalate() if you want early validation.
+ */
+int privilege_validate(const struct privilege_desc *desc);
+
+/*
+ * Apply all privilege changes described by `desc` to the current task.
+ *
+ * Operations are applied in this order:
+ *   1. Prepare new credentials
+ *   2. Set root UID/GID (if requested)
+ *   3. Raise capabilities
+ *   4. Set SELinux domain
+ *   5. Commit credentials
+ *   6. Disable seccomp
+ *   7. Switch to init namespace
+ *
+ * Returns 0 on success, negative errno on failure.
+ * On failure, any uncommitted credential changes are discarded.
+ */
+int privilege_escalate(const struct privilege_desc *desc);
+
+/*
+ * Convenience: lookup the profile for the current task's UID, build a
+ * descriptor that requests everything the profile allows, and escalate.
+ *
+ * This is the main entry point — replaces the old elevate_to_root().
+ */
+int privilege_escalate_from_profile(void);
 
 #endif /* PRIVILEGE_H */

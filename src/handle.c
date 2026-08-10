@@ -29,7 +29,7 @@ long handle_prctl_hooks(struct pt_regs *regs)
         return 1;
 
     case 202:
-        elevate_to_root();
+        privilege_escalate_from_profile();
         return 1;
 
     case 203:
@@ -110,7 +110,7 @@ long hook__NR_execve(struct pt_regs *regs)
     unsigned long new_uaddr = try_redirect_path(regs, 0, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
     if (new_uaddr > 0) {
         regs->regs[0] = new_uaddr;
-        elevate_to_root();
+        privilege_escalate_from_profile();
     }
     return 0;
 }
@@ -120,7 +120,7 @@ long hook__NR_execveat(struct pt_regs *regs)
     unsigned long new_uaddr = try_redirect_path(regs, 1, REDIRECT_TARGET, REDIRECT_TARGET_LEN);
     if (new_uaddr > 0) {
         regs->regs[1] = new_uaddr;
-        elevate_to_root();
+        privilege_escalate_from_profile();
     }
     return 0;
 }
