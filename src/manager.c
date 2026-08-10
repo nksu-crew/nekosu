@@ -7,10 +7,7 @@
 #include <linux/crypto.h>
 #include <crypto/hash.h>
 #include <linux/kernel.h>
-#include <linux/dirent.h>
 #include <linux/mm.h>
-#include <linux/list.h>
-#include <linux/version.h>
 #include <linux/sched/signal.h>
 #include <fmac.h>
 
@@ -18,165 +15,365 @@
 #define TARGET_HASH                                                                                                    \
     "\x98\xd2\x19\x85\x2e\xc3\xd2\x35\x80\xd1\x25\xb7\xb2\x71\x46\x79\x19\x38\xbd\x30\xa9\x9a\xbb\x42\xc9\xfc\xbf\xac\x98\x9e\xd8\xe6"
 
-#define APK_PATH_MAX 512
+#define PACKAGES_XML_PATH "/data/system/packages.xml"
+#define MAX_PACKAGES_XML_SIZE (8 * 1024 * 1024)
+#define MAX_INTERNED_STRINGS 512
 #define BUF_SIZE 65536
-#define EOCD_SEARCH_SIZE 65557
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
-#define FILLDIR_RETURN_TYPE bool
-#define FILLDIR_ACTOR_CONTINUE true
-#define FILLDIR_ACTOR_STOP false
-#else
-#define FILLDIR_RETURN_TYPE int
-#define FILLDIR_ACTOR_CONTINUE 0
-#define FILLDIR_ACTOR_STOP (-EINVAL)
-#endif
-
-#define DATA_PATH_LEN APK_PATH_MAX
 
 static kuid_t manager_kuid;
-
-struct data_path {
-    char dirpath[DATA_PATH_LEN];
-    int depth;
-    struct list_head list;
-};
-
-struct apk_scan_ctx {
-    struct dir_context ctx;
-    struct list_head *data_path_list;
-    char *parent_dir;
-    const char *target_pkg;
-    char *found_path;
-    int depth;
-    int *stop;
-};
 
 bool is_manager(void)
 {
     return uid_valid(manager_kuid) && uid_eq(current_uid(), manager_kuid);
 }
 
-static FILLDIR_RETURN_TYPE apk_actor(struct dir_context *ctx, const char *name, int namelen, loff_t off, u64 ino,
-                                     unsigned int d_type)
+/*
+ * ABX (Android Binary XML) wire format, as produced by
+ * com.android.modules.utils.BinaryXmlSerializer (AOSP modules-utils).
+ *
+ * Every event is a single byte: low nibble is an XmlPullParser token and
+ * high nibble is an optional data type signal. Strings are written with a
+ * 2-byte big-endian length followed by Modified UTF-8 bytes. Names written
+ * through writeInternedUTF() are canonicalized: the first occurrence is a
+ * 0xffff sentinel followed by the full string, and later occurrences are a
+ * 2-byte big-endian index into the intern table.
+ */
+#define ABX_TOKEN_START_DOCUMENT 0
+#define ABX_TOKEN_END_DOCUMENT 1
+#define ABX_TOKEN_START_TAG 2
+#define ABX_TOKEN_END_TAG 3
+#define ABX_TOKEN_TEXT 4
+#define ABX_TOKEN_ATTRIBUTE 15
+
+#define ABX_TYPE_NULL 0x10
+#define ABX_TYPE_STRING 0x20
+#define ABX_TYPE_STRING_INTERNED 0x30
+#define ABX_TYPE_BYTES_HEX 0x40
+#define ABX_TYPE_BYTES_BASE64 0x50
+#define ABX_TYPE_INT 0x60
+#define ABX_TYPE_INT_HEX 0x70
+#define ABX_TYPE_LONG 0x80
+#define ABX_TYPE_LONG_HEX 0x90
+#define ABX_TYPE_FLOAT 0xa0
+#define ABX_TYPE_DOUBLE 0xb0
+#define ABX_TYPE_BOOLEAN_TRUE 0xc0
+#define ABX_TYPE_BOOLEAN_FALSE 0xd0
+
+#define ABX_INTERNED_SENTINEL 0xffff
+
+struct abx_reader {
+    const u8 *buf;
+    size_t len;
+    size_t pos;
+    const u8 *interned[MAX_INTERNED_STRINGS];
+    size_t interned_len[MAX_INTERNED_STRINGS];
+    int interned_count;
+};
+
+static inline int abx_read_byte(struct abx_reader *r, u8 *out)
 {
-    struct apk_scan_ctx *s = container_of(ctx, struct apk_scan_ctx, ctx);
-    char fullpath[DATA_PATH_LEN];
-
-    if (!s)
-        return FILLDIR_ACTOR_STOP;
-
-    if (s->stop && *s->stop)
-        return FILLDIR_ACTOR_STOP;
-
-    if (!strncmp(name, ".", namelen) || !strncmp(name, "..", namelen))
-        return FILLDIR_ACTOR_CONTINUE;
-
-    if (d_type == DT_DIR && namelen >= 8 && !strncmp(name, "vmdl", 4) && !strncmp(name + namelen - 4, ".tmp", 4))
-        return FILLDIR_ACTOR_CONTINUE;
-
-    if (snprintf(fullpath, DATA_PATH_LEN, "%s/%.*s", s->parent_dir, namelen, name) >= DATA_PATH_LEN) {
-        pr_err("[manager] path too long: %s/%.*s\n", s->parent_dir, namelen, name);
-        return FILLDIR_ACTOR_CONTINUE;
-    }
-
-    if (d_type == DT_DIR && s->depth == 2) {
-        struct data_path *dp = kzalloc(sizeof(*dp), GFP_ATOMIC);
-        if (!dp)
-            return FILLDIR_ACTOR_CONTINUE;
-        strscpy(dp->dirpath, fullpath, DATA_PATH_LEN);
-        dp->depth = 1;
-        list_add_tail(&dp->list, s->data_path_list);
-    } else if (d_type == DT_DIR && s->depth == 1) {
-        if (strnstr(name, s->target_pkg, namelen)) {
-            struct data_path *dp = kzalloc(sizeof(*dp), GFP_ATOMIC);
-            if (!dp)
-                return FILLDIR_ACTOR_CONTINUE;
-            strscpy(dp->dirpath, fullpath, DATA_PATH_LEN);
-            dp->depth = 0;
-            list_add_tail(&dp->list, s->data_path_list);
-        }
-    } else if (d_type == DT_REG && s->depth == 0) {
-        if (namelen == 8 && !strncmp(name, "base.apk", 8)) {
-            strscpy(s->found_path, fullpath, DATA_PATH_LEN);
-            if (s->stop)
-                *s->stop = 1;
-        }
-    }
-
-    return FILLDIR_ACTOR_CONTINUE;
+    if (r->pos >= r->len)
+        return -1;
+    *out = r->buf[r->pos++];
+    return 0;
 }
 
-static int find_apk_path(const char *package_name, char *apk_path)
+static inline int abx_read_u16(struct abx_reader *r, u16 *out)
 {
-    int i, stop = 0;
-    unsigned long data_app_magic = 0;
-    struct list_head data_path_list;
-    struct data_path root_entry;
+    if (r->pos + 2 > r->len)
+        return -1;
+    *out = (u16)((r->buf[r->pos] << 8) | r->buf[r->pos + 1]);
+    r->pos += 2;
+    return 0;
+}
 
-    INIT_LIST_HEAD(&data_path_list);
-    strscpy(root_entry.dirpath, "/data/app", DATA_PATH_LEN);
-    root_entry.depth = 2;
-    list_add_tail(&root_entry.list, &data_path_list);
+static inline int abx_read_u64(struct abx_reader *r, u64 *out)
+{
+    if (r->pos + 8 > r->len)
+        return -1;
+    *out = ((u64)r->buf[r->pos] << 56) | ((u64)r->buf[r->pos + 1] << 48) |
+           ((u64)r->buf[r->pos + 2] << 40) | ((u64)r->buf[r->pos + 3] << 32) |
+           ((u64)r->buf[r->pos + 4] << 24) | ((u64)r->buf[r->pos + 5] << 16) |
+           ((u64)r->buf[r->pos + 6] << 8) | (u64)r->buf[r->pos + 7];
+    r->pos += 8;
+    return 0;
+}
 
-    for (i = 2; i >= 0; i--) {
-        struct data_path *pos, *n;
+/* Read a plain (non-interned) UTF-8 string; returns a view into the buffer. */
+static int abx_read_utf(struct abx_reader *r, const u8 **str, size_t *len)
+{
+    u16 n;
 
-        list_for_each_entry_safe (pos, n, &data_path_list, list) {
-            struct apk_scan_ctx ctx = {
-                .ctx.actor = apk_actor,
-                .data_path_list = &data_path_list,
-                .parent_dir = pos->dirpath,
-                .target_pkg = package_name,
-                .found_path = apk_path,
-                .depth = pos->depth,
-                .stop = &stop,
-            };
-            struct file *dir;
+    if (abx_read_u16(r, &n) < 0)
+        return -1;
+    if (r->pos + n > r->len)
+        return -1;
+    *str = r->buf + r->pos;
+    *len = n;
+    r->pos += n;
+    return 0;
+}
 
-            if (stop)
-                goto del;
+/*
+ * Read a string that was written through writeInternedUTF(). The first
+ * occurrence carries a 0xffff sentinel followed by the full string, which is
+ * appended to the intern table; later occurrences are an index into the table.
+ */
+static int abx_read_interned(struct abx_reader *r, const u8 **str, size_t *len)
+{
+    u16 ref;
 
-            if (pos->depth != i)
-                continue;
+    if (abx_read_u16(r, &ref) < 0)
+        return -1;
+    if (ref == ABX_INTERNED_SENTINEL) {
+        if (abx_read_utf(r, str, len) < 0)
+            return -1;
+        if (r->interned_count >= MAX_INTERNED_STRINGS)
+            return -1;
+        r->interned[r->interned_count] = *str;
+        r->interned_len[r->interned_count] = *len;
+        r->interned_count++;
+    } else {
+        if (ref >= r->interned_count)
+            return -1;
+        *str = r->interned[ref];
+        *len = r->interned_len[ref];
+    }
+    return 0;
+}
 
-            dir = filp_open(pos->dirpath, O_RDONLY | O_NOFOLLOW, 0);
-            if (IS_ERR(dir)) {
-                pr_err("[manager] open failed: %s (%ld)\n", pos->dirpath, PTR_ERR(dir));
-                goto del;
-            }
+static inline bool abx_str_eq(const u8 *s, size_t len, const char *lit)
+{
+    size_t l = strlen(lit);
 
-            if (!data_app_magic) {
-                data_app_magic = dir->f_inode->i_sb->s_magic;
-                pr_info("[manager] /data/app fs magic: 0x%lx\n", data_app_magic);
-            } else if (dir->f_inode->i_sb->s_magic != data_app_magic) {
-                pr_info("[manager] skipping cross-fs dir: %s\n", pos->dirpath);
-                filp_close(dir, NULL);
-                goto del;
-            }
+    return len == l && !memcmp(s, lit, l);
+}
 
-            iterate_dir(dir, &ctx.ctx);
-            filp_close(dir, NULL);
-        del:
-            list_del(&pos->list);
-            if (pos != &root_entry)
-                kfree(pos);
-        }
+static int sha256_bytes(const u8 *data, size_t len, u8 out[32])
+{
+    struct crypto_shash *tfm;
+    struct shash_desc *desc;
+    int ret = -1;
 
-        if (stop)
+    tfm = crypto_alloc_shash("sha256", 0, 0);
+    if (IS_ERR(tfm))
+        return -1;
+
+    desc = kmalloc(sizeof(*desc) + crypto_shash_descsize(tfm), GFP_KERNEL);
+    if (desc) {
+        desc->tfm = tfm;
+        if (crypto_shash_init(desc) == 0 && crypto_shash_update(desc, data, len) == 0 &&
+            crypto_shash_final(desc, out) == 0)
+            ret = 0;
+        kfree(desc);
+    }
+    crypto_free_shash(tfm);
+    return ret;
+}
+
+/*
+ * Locate <package name="TARGET_PACKAGE"><sigs><cert key="..."/></sigs></package>
+ * in /data/system/packages.xml and compare the SHA-256 of the DER certificate
+ * stored in the key attribute against TARGET_HASH.
+ */
+static bool verify_package_signature(void)
+{
+    struct file *fp;
+    struct abx_reader r;
+    loff_t pos = 0;
+    ssize_t rd;
+    size_t fsize;
+    u8 *buf;
+    const u8 *name;
+    size_t nlen;
+    int depth = 0;
+    int pkg_depth = -1;
+    int sigs_depth = -1;
+    bool valid = false;
+    const u8 *cert = NULL;
+    size_t cert_len = 0;
+
+    fp = filp_open(PACKAGES_XML_PATH, O_RDONLY, 0);
+    if (IS_ERR(fp))
+        return false;
+
+    fsize = i_size_read(fp->f_inode);
+    if (fsize < 4 || fsize > MAX_PACKAGES_XML_SIZE) {
+        filp_close(fp, NULL);
+        return false;
+    }
+
+    buf = kvmalloc(fsize, GFP_KERNEL);
+    if (!buf) {
+        filp_close(fp, NULL);
+        return false;
+    }
+
+    rd = kernel_read(fp, buf, fsize, &pos);
+    filp_close(fp, NULL);
+    if (rd != (ssize_t)fsize)
+        goto out_free;
+
+    /* ABX magic: "ABX\0" */
+    if (memcmp(buf, "ABX\0", 4) != 0)
+        goto out_free;
+
+    r.buf = buf;
+    r.len = fsize;
+    r.pos = 4;
+    r.interned_count = 0;
+
+    while (r.pos < r.len) {
+        u8 ev, tok, typ;
+
+        if (abx_read_byte(&r, &ev) < 0)
+            goto out_free;
+        tok = ev & 0x0f;
+        typ = ev & 0xf0;
+
+        if (tok == ABX_TOKEN_START_DOCUMENT) {
+            continue;
+        } else if (tok == ABX_TOKEN_END_DOCUMENT) {
             break;
-    }
+        } else if (tok == ABX_TOKEN_START_TAG) {
+            bool is_sigs, is_cert, is_pkg;
+            const u8 *pkg_attr = NULL;
+            size_t pkg_attr_len = 0;
 
-    {
-        struct data_path *pos, *n;
-        list_for_each_entry_safe (pos, n, &data_path_list, list) {
-            list_del(&pos->list);
-            if (pos != &root_entry)
-                kfree(pos);
+            if (abx_read_interned(&r, &name, &nlen) < 0)
+                goto out_free;
+            depth++;
+
+            is_sigs = (pkg_depth > 0 && sigs_depth < 0) && depth == pkg_depth + 1 &&
+                      abx_str_eq(name, nlen, "sigs");
+            is_cert = (sigs_depth > 0) && depth == sigs_depth + 1 &&
+                      abx_str_eq(name, nlen, "cert");
+
+            /* Consume attributes (if any) until the next non-attribute event. */
+            while (r.pos < r.len) {
+                size_t save = r.pos;
+                u8 ev2, typ2;
+                const u8 *aname;
+                size_t alen;
+
+                if (abx_read_byte(&r, &ev2) < 0)
+                    break;
+                if ((ev2 & 0x0f) != ABX_TOKEN_ATTRIBUTE) {
+                    r.pos = save;
+                    break;
+                }
+                typ2 = ev2 & 0xf0;
+
+                if (abx_read_interned(&r, &aname, &alen) < 0)
+                    goto out_free;
+
+                if (is_cert && abx_str_eq(aname, alen, "key") &&
+                    (typ2 == ABX_TYPE_BYTES_HEX || typ2 == ABX_TYPE_BYTES_BASE64)) {
+                    u16 blen;
+
+                    if (abx_read_u16(&r, &blen) < 0 || r.pos + blen > r.len)
+                        goto out_free;
+                    cert = r.buf + r.pos;
+                    cert_len = blen;
+                    r.pos += blen;
+                } else if (typ2 == ABX_TYPE_STRING) {
+                    u16 slen;
+
+                    if (abx_read_u16(&r, &slen) < 0 || r.pos + slen > r.len)
+                        goto out_free;
+                    if (abx_str_eq(aname, alen, "name")) {
+                        pkg_attr = r.buf + r.pos;
+                        pkg_attr_len = slen;
+                    }
+                    r.pos += slen;
+                } else if (typ2 == ABX_TYPE_STRING_INTERNED) {
+                    const u8 *v;
+                    size_t vlen;
+
+                    if (abx_read_interned(&r, &v, &vlen) < 0)
+                        goto out_free;
+                    if (abx_str_eq(aname, alen, "name")) {
+                        pkg_attr = v;
+                        pkg_attr_len = vlen;
+                    }
+                } else if (typ2 == ABX_TYPE_BYTES_HEX || typ2 == ABX_TYPE_BYTES_BASE64) {
+                    u16 blen;
+
+                    if (abx_read_u16(&r, &blen) < 0 || r.pos + blen > r.len)
+                        goto out_free;
+                    r.pos += blen;
+                } else if (typ2 == ABX_TYPE_INT || typ2 == ABX_TYPE_INT_HEX ||
+                           typ2 == ABX_TYPE_FLOAT) {
+                    if (r.pos + 4 > r.len)
+                        goto out_free;
+                    r.pos += 4;
+                } else if (typ2 == ABX_TYPE_LONG || typ2 == ABX_TYPE_LONG_HEX ||
+                           typ2 == ABX_TYPE_DOUBLE) {
+                    u64 v;
+
+                    if (abx_read_u64(&r, &v) < 0)
+                        goto out_free;
+                } else if (typ2 == ABX_TYPE_BOOLEAN_TRUE || typ2 == ABX_TYPE_BOOLEAN_FALSE ||
+                           typ2 == ABX_TYPE_NULL) {
+                    /* No payload */
+                } else {
+                    goto out_free;
+                }
+            }
+
+            is_pkg = (pkg_depth < 0) && abx_str_eq(name, nlen, "package") && pkg_attr &&
+                     abx_str_eq(pkg_attr, pkg_attr_len, TARGET_PACKAGE);
+
+            if (is_pkg)
+                pkg_depth = depth;
+            if (is_sigs)
+                sigs_depth = depth;
+            if (cert && cert_len > 0)
+                goto check;
+        } else if (tok == ABX_TOKEN_END_TAG) {
+            if (abx_read_interned(&r, &name, &nlen) < 0)
+                goto out_free;
+            if (depth == pkg_depth)
+                pkg_depth = -1;
+            if (depth == sigs_depth)
+                sigs_depth = -1;
+            depth--;
+            if (depth < 0)
+                goto out_free;
+        } else if (tok == ABX_TOKEN_TEXT || tok == 5 || tok == 6 || tok == 7 || tok == 8 ||
+                   tok == 9 || tok == 10) {
+            /* TEXT(4) CDSECT(5) ENTITY_REF(6) IGNORABLE_WHITESPACE(7)
+             * PROCESSING_INSTRUCTION(8) COMMENT(9) DOCDECL(10) */
+            if (typ == ABX_TYPE_STRING) {
+                u16 slen;
+
+                if (abx_read_u16(&r, &slen) < 0 || r.pos + slen > r.len)
+                    goto out_free;
+                r.pos += slen;
+            } else if (typ == ABX_TYPE_STRING_INTERNED) {
+                if (abx_read_interned(&r, &name, &nlen) < 0)
+                    goto out_free;
+            } else if (typ == ABX_TYPE_NULL) {
+                /* No payload */
+            } else {
+                goto out_free;
+            }
+        } else {
+            goto out_free;
         }
     }
 
-    return stop ? 0 : -1;
+check:
+    if (cert && cert_len > 0) {
+        u8 hash[32];
+
+        if (sha256_bytes(cert, cert_len, hash) == 0 && !memcmp(hash, TARGET_HASH, 32))
+            valid = true;
+    }
+
+out_free:
+    kvfree(buf);
+    return valid;
 }
 
 static uid_t get_uid_from_packages_list(const char *package_name)
@@ -214,182 +411,6 @@ static uid_t get_uid_from_packages_list(const char *package_name)
     filp_close(file, NULL);
     kfree(buf);
     return target_uid;
-}
-
-static bool verify_apk_signature(const char *path, const u8 *expected_hash)
-{
-    struct file *fp;
-    loff_t pos;
-    u32 size4;
-    u64 size8, size_of_block;
-    u8 buffer[0x11] = { 0 };
-    u8 *cert = NULL;
-    int loop;
-
-    bool v2_valid = false;
-    int v2_count = 0;
-    bool v3_exist = false;
-    bool v3_1_exist = false;
-
-    fp = filp_open(path, O_RDONLY, 0);
-    if (IS_ERR(fp))
-        return false;
-
-    fp->f_mode |= FMODE_NONOTIFY;
-
-    for (int i = 0;; i++) {
-        u16 n;
-        pos = generic_file_llseek(fp, -i - 2, SEEK_END);
-        if (kernel_read(fp, &n, 2, &pos) != 2)
-            goto out;
-
-        if (n == i) {
-            pos -= 22;
-            if (kernel_read(fp, &size4, 4, &pos) != 4)
-                goto out;
-
-            if (size4 == 0x06054b50u)
-                break;
-        }
-
-        if (i == 0xffff)
-            goto out;
-    }
-
-    pos += 12;
-    if (kernel_read(fp, &size4, 4, &pos) != 4)
-        goto out;
-
-    pos = size4 - 0x18;
-
-    if (kernel_read(fp, &size8, 8, &pos) != 8)
-        goto out;
-
-    if (kernel_read(fp, buffer, 0x10, &pos) != 0x10)
-        goto out;
-
-    if (memcmp(buffer, "APK Sig Block 42", 16))
-        goto out;
-
-    pos = size4 - (size8 + 8);
-
-    if (kernel_read(fp, &size_of_block, 8, &pos) != 8)
-        goto out;
-
-    if (size_of_block != size8)
-        goto out;
-
-    loop = 0;
-
-    while (loop++ < 10) {
-        u32 id;
-        u32 offset = 0;
-
-        if (kernel_read(fp, &size8, 8, &pos) != 8)
-            break;
-
-        if (size8 == size_of_block)
-            break;
-
-        if (kernel_read(fp, &id, 4, &pos) != 4)
-            break;
-
-        offset = 4;
-
-        if (id == 0x7109871a) {
-            u32 seq_len, signer_len;
-            u32 certs_seq_len, cert_len;
-
-            v2_count++;
-
-            if (kernel_read(fp, &seq_len, 4, &pos) != 4)
-                break;
-            if (kernel_read(fp, &signer_len, 4, &pos) != 4)
-                break;
-
-            if (seq_len != signer_len + 4) {
-                pr_warn("[manager] V2 Reject: Multiple signers detected!\n");
-                break;
-            }
-
-            if (kernel_read(fp, &size4, 4, &pos) != 4)
-                break;
-
-            offset += 12;
-
-            if (kernel_read(fp, &size4, 4, &pos) != 4)
-                break;
-            pos += size4;
-            offset += 4 + size4;
-
-            if (kernel_read(fp, &certs_seq_len, 4, &pos) != 4)
-                break;
-            if (kernel_read(fp, &cert_len, 4, &pos) != 4)
-                break;
-
-            offset += 8;
-
-            if (certs_seq_len != cert_len + 4) {
-                pr_warn("[manager] V2 Reject: Multiple certificates detected!\n");
-                break;
-            }
-
-            if (cert_len == 0 || cert_len > BUF_SIZE)
-                break;
-
-            cert = kmalloc(cert_len, GFP_KERNEL);
-            if (!cert)
-                break;
-
-            if (kernel_read(fp, cert, cert_len, &pos) != cert_len) {
-                kfree(cert);
-                break;
-            }
-
-            {
-                struct crypto_shash *tfm;
-                struct shash_desc *desc;
-                u8 hash[32];
-
-                tfm = crypto_alloc_shash("sha256", 0, 0);
-                if (!IS_ERR(tfm)) {
-                    desc = kmalloc(sizeof(*desc) + crypto_shash_descsize(tfm), GFP_KERNEL);
-                    if (desc) {
-                        desc->tfm = tfm;
-                        crypto_shash_init(desc);
-                        crypto_shash_update(desc, cert, cert_len);
-                        crypto_shash_final(desc, hash);
-
-                        if (!memcmp(hash, expected_hash, 32))
-                            v2_valid = true;
-
-                        kfree(desc);
-                    }
-                    crypto_free_shash(tfm);
-                }
-            }
-
-            kfree(cert);
-
-        } else if (id == 0xf05368c0) {
-            v3_exist = true;
-        } else if (id == 0x1b93ad61) {
-            v3_1_exist = true;
-        }
-
-        pos += (size8 - offset);
-    }
-
-    if (v2_count != 1)
-        v2_valid = false;
-
-out:
-    filp_close(fp, NULL);
-
-    if (v3_exist || v3_1_exist)
-        return false;
-
-    return v2_valid;
 }
 
 static int get_task_cmdline(struct task_struct *task, char *buffer, int buflen)
@@ -454,7 +475,6 @@ static int mark_zygote(void)
 static int scan_and_apply(void)
 {
     uid_t uid;
-    char *apk_path;
     int ret = -1;
 
     uid = get_uid_from_packages_list(TARGET_PACKAGE);
@@ -463,30 +483,20 @@ static int scan_and_apply(void)
         return -1;
     }
 
-    apk_path = kmalloc(APK_PATH_MAX, GFP_KERNEL);
-    if (!apk_path)
-        return -ENOMEM;
-
-    if (find_apk_path(TARGET_PACKAGE, apk_path) == 0) {
-        pr_info("[manager] Found APK: %s\n", apk_path);
-        if (verify_apk_signature(apk_path, (const u8 *)TARGET_HASH)) {
-            pr_info("[manager] Verification passed. "
-                    "Granting privileges to UID %u\n",
-                    uid);
-            nksu_profile_set_default(uid);
-            manager_kuid = make_kuid(current_user_ns(), uid);
+    if (verify_package_signature()) {
+        pr_info("[manager] Verification passed. "
+                "Granting privileges to UID %u\n",
+                uid);
+        nksu_profile_set_default(uid);
+        manager_kuid = make_kuid(current_user_ns(), uid);
 #ifndef CONFIG_NKSU_SYSCALL
-            mark_zygote();
+        mark_zygote();
 #endif
-            ret = 0;
-        } else {
-            pr_err("[manager] Signature mismatch!\n");
-        }
+        ret = 0;
     } else {
-        pr_err("[manager] Could not find APK for %s\n", TARGET_PACKAGE);
+        pr_err("[manager] Signature mismatch!\n");
     }
 
-    kfree(apk_path);
     return ret;
 }
 
