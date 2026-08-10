@@ -19,7 +19,6 @@
 #include "selinux/rule.h"
 #include "selinux/policy.h"
 #include "selinux/domain.h"
-#include "selinux/dup.h"
 
 #include "klog.h"
 #include "privilege.h"

@@ -1,6 +1,6 @@
 nksu-y += src/nksu.o src/privilege.o src/ioctl.o src/manager.o
 
-nksu-y += src/selinux/rule.o src/selinux/selinux.o src/selinux/policy.o src/selinux/domain.o src/selinux/dup.o 
+nksu-y += src/selinux/rule.o src/selinux/selinux.o src/selinux/policy.o src/selinux/domain.o
 
 nksu-y += src/profile/profile.o
 nksu-y += src/ns.o
