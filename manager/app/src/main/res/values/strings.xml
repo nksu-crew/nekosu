@@ -228,4 +228,19 @@
     <string name="about_card_description">Learn more about nekosu feature and how to use</string>
 <string name="about_card_title">Learn nekosu</string>
 <string name="finger_print">Fingerprint</string>
+
+    <!-- 热更新 -->
+    <string name="hot_update_title">Hot Update</string>
+    <string name="check_hot_update">Check for Updates</string>
+    <string name="check_hot_update_describe">Download and apply hotfix patches</string>
+    <string name="hot_update_checking">Checking for updates…</string>
+    <string name="hot_update_no_update">No update available. You are running the latest version.</string>
+    <string name="hot_update_available">A new patch is available:\n%1$s\n\nDownload and apply now?</string>
+    <string name="hot_update_download_apply">Download &amp; Apply</string>
+    <string name="hot_update_downloading">Downloading patch…</string>
+    <string name="hot_update_ready">Patch applied successfully! Restart now to take effect.</string>
+    <string name="hot_update_restart">Restart Now</string>
+    <string name="hot_update_later">Later</string>
+    <string name="hot_update_error_download">Failed to download the patch. Please check your network and try again.</string>
+    <string name="hot_update_error_move">Failed to prepare the patch. Please try again.</string>
 </resources>

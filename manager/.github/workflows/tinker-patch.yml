@@ -1,0 +1,223 @@
+# ────────────────────────────────────────────────
+# Tinker 热更新补丁生成 Action
+# ────────────────────────────────────────────────
+# 两种触发模式：
+#   baseline-*  tag  →  归档旧包基线（APK + mapping.txt + R.txt）
+#   v*  tag / push to main  →  基于最新基线生成补丁并发布
+# ────────────────────────────────────────────────
+
+name: Tinker Patch
+
+on:
+  push:
+    tags:
+      - 'baseline-*'
+      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      baseline_tag:
+        description: '基线 tag 名称 (留空则使用最新 baseline-*)'
+        required: false
+        default: ''
+
+env:
+  BASELINE_TAG_PREFIX: baseline-
+  OLD_APK_DIR: tinker-old
+  PATCH_OUTPUT_DIR: app/build/outputs/tinkerPatch/release
+
+jobs:
+  # ──────────────────────────────────────
+  # Job 1: 归档基线 (baseline-* tag)
+  # ──────────────────────────────────────
+  baseline:
+    if: startsWith(github.ref, 'refs/tags/baseline-')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Collect baseline artifacts
+        run: |
+          mkdir -p $OLD_APK_DIR
+
+          # APK
+          cp app/build/outputs/apk/release/app-release.apk $OLD_APK_DIR/old.apk
+
+          # R8/ProGuard mapping
+          if [ -f app/build/outputs/mapping/release/mapping.txt ]; then
+            cp app/build/outputs/mapping/release/mapping.txt $OLD_APK_DIR/
+          else
+            echo "(no mapping file — R8 may be disabled)" > $OLD_APK_DIR/mapping.txt
+          fi
+
+          # R.txt
+          if [ -f app/build/intermediates/runtime_symbol_list/release/R.txt ]; then
+            cp app/build/intermediates/runtime_symbol_list/release/R.txt $OLD_APK_DIR/
+          else
+            R_TXT=$(find app/build -name "R.txt" -path "*/release/*" 2>/dev/null | head -1)
+            if [ -n "$R_TXT" ]; then cp "$R_TXT" $OLD_APK_DIR/; fi
+          fi
+
+          echo "=== Baseline artifacts ==="
+          ls -lh $OLD_APK_DIR/
+
+      - name: Create or update baseline release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Baseline ${{ github.ref_name }}"
+          body: |
+            ## Tinker Baseline
+
+            - **Commit**: ${{ github.sha }}
+            - **Tag**: ${{ github.ref_name }}
+
+            此 Release 仅存储旧版本 APK 基线文件，供后续 Tinker 补丁生成使用。
+          files: |
+            ${{ env.OLD_APK_DIR }}/*
+          prerelease: false
+          make_latest: false
+
+  # ──────────────────────────────────────
+  # Job 2: 生成补丁 (v* tag / push to main)
+  # ──────────────────────────────────────
+  patch:
+    if: >
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/baseline-'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # ── 下载基线 ──
+      - name: Find latest baseline release
+        id: find-baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ github.event.inputs.baseline_tag }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            BASELINE_TAG="$INPUT_TAG"
+          else
+            BASELINE_TAG=$(gh release list --limit 30 --json tagName --jq \
+              '[.[].tagName | select(startswith("baseline-"))] | first // ""')
+          fi
+
+          if [ -z "$BASELINE_TAG" ]; then
+            echo "::error::No baseline release found. Push a 'baseline-*' tag first."
+            exit 1
+          fi
+
+          echo "tag=$BASELINE_TAG" >> "$GITHUB_OUTPUT"
+          echo "Using baseline: $BASELINE_TAG"
+
+      - name: Download baseline artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p $OLD_APK_DIR
+          gh release download "${{ steps.find-baseline.outputs.tag }}" \
+            --dir "$OLD_APK_DIR" \
+            --clobber
+
+          echo "=== Downloaded baseline ==="
+          ls -lh $OLD_APK_DIR/
+
+      # ── 构建新 APK ──
+      - name: Build new release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      # ── 生成 Tinker 补丁 ──
+      - name: Generate Tinker patch
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: >
+          ./gradlew tinkerPatchRelease
+          -PoldApk="$OLD_APK_DIR/old.apk"
+          -PoldMapping="$OLD_APK_DIR/mapping.txt"
+          -PoldResourceMapping="$OLD_APK_DIR/R.txt"
+          -PtinkerId="${{ steps.find-baseline.outputs.tag }}"
+
+      - name: Verify patch output
+        run: |
+          echo "=== Patch output ==="
+          find $PATCH_OUTPUT_DIR -type f 2>/dev/null || echo "No patch output found!"
+          ls -lh $PATCH_OUTPUT_DIR/ 2>/dev/null || true
+
+      - name: Rename patch for release
+        id: rename
+        run: |
+          PATCH_FILE=$(find $PATCH_OUTPUT_DIR -name "*.apk" 2>/dev/null | head -1)
+          if [ -z "$PATCH_FILE" ]; then
+            echo "::error::No patch APK found!"
+            exit 1
+          fi
+
+          PATCH_NAME="patch_signed_${{ github.ref_name }}.apk"
+          cp "$PATCH_FILE" "$PATCH_NAME"
+          echo "name=$PATCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "Patch file: $PATCH_NAME ($(du -h "$PATCH_NAME" | cut -f1))"
+
+      # ── 发布补丁到 Release ──
+      - name: Create patch release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Patch ${{ github.ref_name }}"
+          body: |
+            ## Tinker Hot-Update Patch
+
+            - **Baseline**: ${{ steps.find-baseline.outputs.tag }}
+            - **Target Commit**: ${{ github.sha }}
+            - **Ref**: ${{ github.ref_name }}
+
+            ### 使用方法
+            1. 下载 `${{ steps.rename.outputs.name }}`
+            2. 放入应用的 `/data/data/me.nekosu.aqnya/files/tinker_patches/` 目录
+            3. 重启应用即可生效
+
+            或通过应用内「设置 → 检查更新」自动下载安装。
+          files: |
+            ${{ steps.rename.outputs.name }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          make_latest: false

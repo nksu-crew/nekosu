@@ -1,0 +1,19 @@
+# Tinker baseline (local dev only — CI downloads from release)
+/tinker-old/
+
+# Gradle
+.gradle/
+build/
+*/build/
+
+# IDE
+.idea/
+*.iml
+
+# Signing
+debug.keystore
+release.keystore
+
+# OS
+.DS_Store
+Thumbs.db

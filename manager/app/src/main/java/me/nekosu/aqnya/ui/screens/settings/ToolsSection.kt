@@ -19,9 +19,22 @@ import me.nekosu.aqnya.ui.component.ListRow
 @Composable
 fun ToolsSection(
     onExportLog: () -> Unit,
+    onCheckUpdate: () -> Unit = {},
 ) {
     CardGroup {
-        CardItem(index = 0, total = 1) {
+        CardItem(index = 0, total = 2) {
+            ListRow(
+                modifier = Modifier.clickable { onCheckUpdate() },
+                icon = { Icon(Icons.Outlined.Science, contentDescription = null) },
+                headline = {
+                    Text(
+                        stringResource(R.string.check_hot_update),
+                    )
+                },
+                supporting = { Text(stringResource(R.string.check_hot_update_describe)) },
+            )
+        }
+        CardItem(index = 1, total = 2) {
             ListRow(
                 modifier = Modifier.clickable { onExportLog() },
                 icon = { Icon(Icons.Outlined.BugReport, contentDescription = null) },

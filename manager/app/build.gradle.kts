@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     kotlin("plugin.serialization") version embeddedKotlinVersion
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.tinker.patch)
 }
 
 fun gitCommitCount(): Int =
@@ -120,4 +121,71 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// ── Tinker Patch 生成配置 ──
+// 通过 -PoldApk=… -PoldMapping=… -PoldResourceMapping=… 传入旧包路径
+tinkerPatch {
+    // 旧版本 APK 路径（CI 通过 gradle 属性传入）
+    oldApk = project.findProperty("oldApk") as? String
+        ?: "${project.rootDir}/tinker-old/old.apk"
+
+    // ProGuard/R8 mapping 文件
+    applyMapping = project.findProperty("oldMapping") as? String
+        ?: "${project.rootDir}/tinker-old/mapping.txt"
+
+    // R.txt 资源映射文件
+    resourceMapping = project.findProperty("oldResourceMapping") as? String
+        ?: "${project.rootDir}/tinker-old/R.txt"
+
+    // 忽略警告
+    ignoreWarning = true
+
+    // 对生成的补丁签名
+    useSign = true
+
+    tinkerId = project.findProperty("tinkerId") as? String
+        ?: gitCommitHash()
+
+    buildConfig {
+        applyMapping = project.findProperty("oldMapping") as? String
+            ?: "${project.rootDir}/tinker-old/mapping.txt"
+        applyResourceMapping = project.findProperty("oldResourceMapping") as? String
+            ?: "${project.rootDir}/tinker-old/R.txt"
+    }
+
+    dex {
+        // ART 下使用 raw 模式减少补丁体积
+        dexMode = "jar"
+        pattern = listOf(
+            "classes*.dex",
+            "assets/secondary-dex-?.jar",
+        )
+        loader = listOf(
+            "com.tencent.tinker.loader.*",
+            "me.nekosu.aqnya.Application",
+        )
+    }
+
+    lib {
+        pattern = listOf("lib/*/*.so")
+    }
+
+    res {
+        pattern = listOf("res/*", "r/*", "assets/*", "resources.arsc", "AndroidManifest.xml")
+        ignoreChange = listOf(
+            "assets/sample_meta.txt", // 忽略测试资源
+        )
+        largeModSize = 100
+    }
+
+    packageConfig {
+        configField("patchMessage", "tinker patch via CI @ ${gitCommitHash()}")
+        configField("platform", "all")
+        configField("patchVersion", "1.0")
+    }
+
+    sevenZip {
+        zipArtifact = "com.tencent.mm:SevenZip:1.1.10"
+    }
 }
