@@ -10,6 +10,7 @@
 
 #include <linux/capability.h>
 #include <linux/rcupdate.h>
+#include <linux/stddef.h>
 #include <linux/string.h>
 #include <linux/types.h>
 
@@ -43,7 +44,9 @@ struct nksu_profile_blob {
 /* A single profile entry — 20 bytes, cache-line friendly */
 struct nksu_profile_entry {
 	u32 uid;
-	u32 cap_lo, cap_hi;	/* kernel_cap_t split for fixed layout */
+	struct_group(caps_fields,
+		u32 cap_lo, cap_hi;
+	);
 	u16 ns;			/* NKSU_NS_* */
 	u16 domain_off;		/* offset into arena, 0xffff if none */
 	u16 domain_len;
@@ -77,14 +80,14 @@ static inline kernel_cap_t entry_caps(const struct nksu_profile_entry *e)
 {
 	kernel_cap_t c;
 
-	memcpy(&c, &e->cap_lo, sizeof(c));
+	memcpy(&c, &e->caps_fields, sizeof(c));
 	return c;
 }
 
 static inline void entry_set_caps(struct nksu_profile_entry *e,
 				  kernel_cap_t caps)
 {
-	memcpy(&e->cap_lo, &caps, sizeof(caps));
+	memcpy(&e->caps_fields, &caps, sizeof(caps));
 }
 
 /* --- public API --- */
