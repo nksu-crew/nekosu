@@ -65,8 +65,8 @@ struct abx_reader {
     const u8 *buf;
     size_t len;
     size_t pos;
-    const u8 *interned[MAX_INTERNED_STRINGS];
-    size_t interned_len[MAX_INTERNED_STRINGS];
+    const u8 **interned;
+    size_t *interned_len;
     int interned_count;
 };
 
@@ -179,7 +179,7 @@ static int sha256_bytes(const u8 *data, size_t len, u8 out[32])
 static bool verify_package_signature(void)
 {
     struct file *fp;
-    struct abx_reader r;
+    struct abx_reader r = { .interned = NULL, .interned_len = NULL };
     loff_t pos = 0;
     ssize_t rd;
     size_t fsize;
@@ -222,6 +222,11 @@ static bool verify_package_signature(void)
     r.len = fsize;
     r.pos = 4;
     r.interned_count = 0;
+
+    r.interned = kvmalloc_array(MAX_INTERNED_STRINGS, sizeof(*r.interned), GFP_KERNEL);
+    r.interned_len = kvmalloc_array(MAX_INTERNED_STRINGS, sizeof(*r.interned_len), GFP_KERNEL);
+    if (!r.interned || !r.interned_len)
+        goto out_free;
 
     while (r.pos < r.len) {
         u8 ev, tok, typ;
@@ -372,6 +377,8 @@ check:
     }
 
 out_free:
+    kvfree(r.interned);
+    kvfree(r.interned_len);
     kvfree(buf);
     return valid;
 }
