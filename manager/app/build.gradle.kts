@@ -186,6 +186,6 @@ tinkerPatch {
     }
 
     sevenZip {
-        zipArtifact = "com.tencent.mm:SevenZip:1.1.10"
+        zipArtifact = "com.tencent.mm:SevenZip:1.2.17"
     }
 }
