@@ -69,7 +69,11 @@ static inline size_t blob_total_size(const struct nksu_profile_blob *b)
 
 static inline kernel_cap_t entry_caps(const struct nksu_profile_entry *e)
 {
-	return (kernel_cap_t){ { e->cap_lo, e->cap_hi } };
+	kernel_cap_t c;
+
+	c.cap[0] = e->cap_lo;
+	c.cap[1] = e->cap_hi;
+	return c;
 }
 
 /* --- public API --- */
