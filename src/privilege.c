@@ -168,20 +168,22 @@ int privilege_escalate(const struct privilege_desc *desc)
 int privilege_escalate_from_profile(void)
 {
 	struct privilege_desc desc = { 0 };
-	struct profile p;
+	kernel_cap_t caps;
+	int ns;
+	char domain[64];
 	uid_t caller_uid;
 
 	caller_uid = from_kuid(current_user_ns(), current_uid());
-	if (nksu_profile_get_dup(caller_uid, &p) < 0) {
+	if (nksu_profile_get(caller_uid, &caps, &ns, domain, sizeof(domain)) < 0) {
 		pr_err("no profile found for UID %u\n", caller_uid);
 		return -ENOENT;
 	}
 
 	desc.set_root_uidgid = true;
-	desc.caps_to_raise   = p.caps;
-	desc.selinux_domain  = p.selinux_domain[0] ? p.selinux_domain : NULL;
+	desc.caps_to_raise   = caps;
+	desc.selinux_domain  = domain[0] ? domain : NULL;
 	desc.disable_seccomp = true;
-	desc.switch_to_init_ns = (p.namespace == NKSU_NS_GLOBAL);
+	desc.switch_to_init_ns = (ns == NKSU_NS_GLOBAL);
 
 	return privilege_escalate(&desc);
 }

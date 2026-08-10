@@ -87,20 +87,20 @@ static long ioc_set_cap(const void __user *data, unsigned int size)
 
 static long ioc_get_cap(void __user *data, unsigned int size)
 {
-    struct profile p;
+    kernel_cap_t caps;
     unsigned int uid;
-    u64 caps;
+    u64 caps_u64;
 
     if (size < FMAC_DATA_CAP)
         return -EINVAL;
     if (copy_from_user(&uid, data + FMAC_OFF_UID, sizeof(uid)))
         return -EFAULT;
 
-    if (nksu_profile_get_dup((uid_t)uid, &p))
+    if (nksu_profile_get((uid_t)uid, &caps, NULL, NULL, 0))
         return -ENOENT;
 
-    caps = cap_to_u64(p.caps);
-    return copy_to_user(data + FMAC_OFF_CAPS, &caps, sizeof(caps)) ? -EFAULT : 0;
+    caps_u64 = cap_to_u64(caps);
+    return copy_to_user(data + FMAC_OFF_CAPS, &caps_u64, sizeof(caps_u64)) ? -EFAULT : 0;
 }
 
 static long ioc_del_cap(const void __user *data, unsigned int size)
