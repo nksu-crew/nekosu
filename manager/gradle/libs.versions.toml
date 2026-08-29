@@ -14,7 +14,7 @@ kotlinx-serialization-protobuf = "1.11.0"
 okhttp = "5.5.0"
 datastore = "1.2.1"
 ktlint = "14.2.0"
-haze = "1.7.2"
+haze = "1.7.3"
 tinker = "1.9.15.2"
 
 [libraries]
