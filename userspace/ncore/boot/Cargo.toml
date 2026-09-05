@@ -11,4 +11,4 @@ lz4 = "1.28.1"
 zerocopy = { version = "0.8.52", features = ["derive"] }
 
 [build-dependencies]
-bindgen = "0.72.1"
+bindgen = "0.73.0"
