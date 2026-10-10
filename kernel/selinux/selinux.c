@@ -19,6 +19,8 @@
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/file.h>
+#include <linux/mount.h>
+#include <linux/xattr.h>
 #include <linux/magic.h>
 
 #include <fmac.h>
@@ -152,12 +154,20 @@ static void resolve_file_sid(void)
  * nksu_file would be denied.  Instead the file is created normally and the
  * cached inode is relabeled in place, exactly like nksu_relabel_tty_fds().
  * This is what lets init's injected init.rc exec /data/adb/nksu/ncore.
+ *
+ * The in-memory SID alone is not enough: init runs the injected init.rc exec
+ * at post-fs-data, before the manager scan relabels the cached inode, and the
+ * in-memory change is lost on reboot.  So also write the security.selinux
+ * xattr, making the label persist so post-fs-data can exec the daemon on the
+ * next boot (the first boot after install still cannot: the daemon does not
+ * exist until the manager scan runs, after post-fs-data).
  */
 void nksu_relabel_path(const char *path)
 {
 	struct file *file;
 	struct inode *inode;
 	struct inode_security_struct *sec;
+	int rc;
 
 	if (!nksu_file_sid)
 		resolve_file_sid();
@@ -173,6 +183,32 @@ void nksu_relabel_path(const char *path)
 		sec = nksu_inode_security(inode);
 		if (sec)
 			sec->sid = nksu_file_sid;
+	}
+
+	/*
+	 * Persist the context.  Reached through a resolved pointer, so it may be
+	 * NULL on a KMI where the symbol is missing; the in-memory SID above
+	 * still keeps the current boot working in that case.
+	 */
+	if (__vfs_setxattr_noperm) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+		rc = __vfs_setxattr_noperm(mnt_idmap(file->f_path.mnt),
+					   file->f_path.dentry,
+					   XATTR_NAME_SELINUX, DOMAIN_FILE_CTX,
+					   strlen(DOMAIN_FILE_CTX) + 1, 0);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+		rc = __vfs_setxattr_noperm(mnt_user_ns(file->f_path.mnt),
+					   file->f_path.dentry,
+					   XATTR_NAME_SELINUX, DOMAIN_FILE_CTX,
+					   strlen(DOMAIN_FILE_CTX) + 1, 0);
+#else
+		rc = __vfs_setxattr_noperm(file->f_path.dentry, XATTR_NAME_SELINUX,
+					   DOMAIN_FILE_CTX,
+					   strlen(DOMAIN_FILE_CTX) + 1, 0);
+#endif
+		if (rc)
+			pr_warn("nksu: cannot persist label on %s: %d\n", path,
+				rc);
 	}
 
 	filp_close(file, NULL);

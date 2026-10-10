@@ -29,6 +29,7 @@
 #include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/dcache.h>
+#include <linux/xattr.h>
 #include <linux/sched.h>
 #include <linux/sched/task.h>
 #include <linux/sched/signal.h>
@@ -88,6 +89,8 @@ extern typeof(security_context_to_sid) *nksu_security_context_to_sid;
  * through kallsyms like the rest. */
 extern typeof(vfs_mkdir) *nksu_vfs_mkdir;
 extern typeof(lookup_one_len) *nksu_lookup_one_len;
+/* Persist the nksu_file label on the bootstrapped daemon (see selinux.c). */
+extern typeof(__vfs_setxattr_noperm) *nksu___vfs_setxattr_noperm;
 
 /*
  * spawn primitives (kernel/spawn/spawn.c). None of these is exported on GKI, and they
@@ -144,6 +147,7 @@ extern typeof(copy_to_kernel_nofault) *nksu_copy_to_kernel_nofault;
 #define security_context_to_sid          nksu_security_context_to_sid
 #define vfs_mkdir                        nksu_vfs_mkdir
 #define lookup_one_len                   nksu_lookup_one_len
+#define __vfs_setxattr_noperm            nksu___vfs_setxattr_noperm
 #define kernel_thread                    nksu_kernel_thread
 #define kernel_execve                    nksu_kernel_execve
 #define kernel_wait                      nksu_kernel_wait
