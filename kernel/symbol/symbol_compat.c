@@ -41,6 +41,12 @@ typeof(hashtab_destroy) *nksu_hashtab_destroy;
 typeof(hashtab_map) *nksu_hashtab_map;
 typeof(__hashtab_insert) *nksu___hashtab_insert;
 typeof(security_context_to_sid) *nksu_security_context_to_sid;
+typeof(avc_has_perm) *nksu_avc_has_perm;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+typeof(security_sid_to_context) *nksu_security_sid_to_context;
+typeof(security_context_str_to_sid) *nksu_security_context_str_to_sid;
+typeof(security_compute_av_user) *nksu_security_compute_av_user;
+#endif
 typeof(vfs_mkdir) *nksu_vfs_mkdir;
 typeof(vfs_unlink) *nksu_vfs_unlink;
 typeof(lookup_one_len) *nksu_lookup_one_len;
@@ -83,6 +89,14 @@ int nksu_symbol_compat_init(void)
 	NKSU_RESOLVE(nksu_selinux_status_update_policyload,
 		     "selinux_status_update_policyload");
 	NKSU_RESOLVE(nksu_security_context_to_sid, "security_context_to_sid");
+	NKSU_RESOLVE(nksu_avc_has_perm, "avc_has_perm");
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+	NKSU_RESOLVE(nksu_security_sid_to_context, "security_sid_to_context");
+	NKSU_RESOLVE(nksu_security_context_str_to_sid,
+		     "security_context_str_to_sid");
+	NKSU_RESOLVE(nksu_security_compute_av_user,
+		     "security_compute_av_user");
+#endif
 	NKSU_RESOLVE(nksu_vfs_mkdir, "vfs_mkdir");
 	NKSU_RESOLVE(nksu_vfs_unlink, "vfs_unlink");
 	NKSU_RESOLVE(nksu_lookup_one_len, "lookup_one_len");
@@ -144,6 +158,12 @@ void nksu_symbol_compat_exit(void)
 	nksu_selnl_notify_policyload = NULL;
 	nksu_selinux_status_update_policyload = NULL;
 	nksu_security_context_to_sid = NULL;
+	nksu_avc_has_perm = NULL;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+	nksu_security_sid_to_context = NULL;
+	nksu_security_context_str_to_sid = NULL;
+	nksu_security_compute_av_user = NULL;
+#endif
 	nksu_vfs_mkdir = NULL;
 	nksu_vfs_unlink = NULL;
 	nksu_lookup_one_len = NULL;

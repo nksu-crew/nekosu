@@ -83,6 +83,19 @@ extern typeof(hashtab_destroy) *nksu_hashtab_destroy;
 extern typeof(hashtab_map) *nksu_hashtab_map;
 extern typeof(__hashtab_insert) *nksu___hashtab_insert;
 extern typeof(security_context_to_sid) *nksu_security_context_to_sid;
+/*
+ * Policy queries the SELinux hiding answers out of the clean policy.  None of
+ * them is exported.  6.6 dropped the struct selinux_state argument from the
+ * helpers and removed some of them outright; hide.c only calls the raw ones
+ * below 6.6 (6.6+ goes through its own *_with_policy variants), so only
+ * avc_has_perm exists at every version.
+ */
+extern typeof(avc_has_perm) *nksu_avc_has_perm;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+extern typeof(security_sid_to_context) *nksu_security_sid_to_context;
+extern typeof(security_context_str_to_sid) *nksu_security_context_str_to_sid;
+extern typeof(security_compute_av_user) *nksu_security_compute_av_user;
+#endif
 
 /* VFS helpers used to bootstrap /data/adb/nksu in the manager scan.  vfs_mkdir
  * and lookup_one_len are not part of every GKI export set, so reach them
@@ -146,6 +159,12 @@ extern typeof(copy_to_kernel_nofault) *nksu_copy_to_kernel_nofault;
 #define hashtab_destroy                  nksu_hashtab_destroy
 #define hashtab_map                      nksu_hashtab_map
 #define security_context_to_sid          nksu_security_context_to_sid
+#define avc_has_perm                     nksu_avc_has_perm
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+#define security_sid_to_context          nksu_security_sid_to_context
+#define security_context_str_to_sid      nksu_security_context_str_to_sid
+#define security_compute_av_user         nksu_security_compute_av_user
+#endif
 #define vfs_mkdir                        nksu_vfs_mkdir
 #define vfs_unlink                       nksu_vfs_unlink
 #define lookup_one_len                   nksu_lookup_one_len

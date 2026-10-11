@@ -89,6 +89,17 @@ static struct inode_security_struct *nksu_inode_security(const struct inode *ino
 #endif
 
 /*
+ * The kernel's current_sid() (objsec.h) is an inline that goes through
+ * selinux_cred(), so its expansion references selinux_blob_sizes.  A file that
+ * uses it before symbol_compat.h is in scope gets a relocation against that
+ * unexported data symbol and the module fails to load, so hide.c asks here.
+ */
+u32 nksu_current_sid(void)
+{
+	return nksu_cred_security(current_cred())->sid;
+}
+
+/*
  * Switch a cred's security context to the given domain.
  * Old SID is saved in ->osid so we can restore it later.
  * See selinux_bprm_committing_creds() for the canonical pattern.

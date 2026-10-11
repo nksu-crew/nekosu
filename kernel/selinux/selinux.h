@@ -12,6 +12,13 @@ bool getenforce(void);
 int  set_domain(const char *domain, struct cred *new_cred);
 
 /*
+ * Subjective SID of the current task.  The kernel's current_sid() inline pulls
+ * in selinux_blob_sizes via selinux_cred(); this accessor avoids the
+ * relocation (see selinux.c).  hide.c uses it for its avc_has_perm checks.
+ */
+u32  nksu_current_sid(void);
+
+/*
  * Relabel the caller's terminal (pts) fds to DOMAIN_FILE.  The package
  * manager hands the caller's tty to system_server through the binder
  * ShellCallback; without this, system_server's write to the pty is denied and

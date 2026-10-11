@@ -353,7 +353,7 @@ static ssize_t nksu_write_context(struct file *file, char *buf, size_t size)
         return orig_context_write(file, buf, size);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-    length = avc_has_perm(current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY,
+    length = avc_has_perm(nksu_current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY,
                           SECURITY__CHECK_CONTEXT, NULL);
     if (length)
         goto out;
@@ -367,7 +367,7 @@ static ssize_t nksu_write_context(struct file *file, char *buf, size_t size)
     if (length)
         goto out;
 #else
-    length = avc_has_perm(&selinux_state, current_sid(), SECINITSID_SECURITY,
+    length = avc_has_perm(&selinux_state, nksu_current_sid(), SECINITSID_SECURITY,
                           SECCLASS_SECURITY, SECURITY__CHECK_CONTEXT, NULL);
     if (length)
         goto out;
@@ -404,10 +404,10 @@ static ssize_t nksu_write_access(struct file *file, char *buf, size_t size)
         return orig_access_write(file, buf, size);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-    length = avc_has_perm(current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY,
+    length = avc_has_perm(nksu_current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY,
                           SECURITY__COMPUTE_AV, NULL);
 #else
-    length = avc_has_perm(&selinux_state, current_sid(), SECINITSID_SECURITY,
+    length = avc_has_perm(&selinux_state, nksu_current_sid(), SECINITSID_SECURITY,
                           SECCLASS_SECURITY, SECURITY__COMPUTE_AV, NULL);
 #endif
     if (length)
