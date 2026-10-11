@@ -14,6 +14,7 @@
 #include <linux/atomic.h>
 #include <linux/cpumask.h>
 #include <linux/printk.h>
+#include <linux/spinlock.h> /* cpu_relax() */
 #include <asm/tlbflush.h>
 #include <asm/fixmap.h>
 #include <asm/pgtable.h>
