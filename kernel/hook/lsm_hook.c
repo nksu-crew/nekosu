@@ -11,9 +11,9 @@
  *
  * The whole file calls resolved-but-unexported functions through pointers and
  * patches RO data through a fixmap, so it drops the CFI check at its own call
- * sites the same way selinux/*.c do.
+ * sites the same way the rest of the selinux subsystem does.
  */
-#include <linux/barrier.h>
+#include <asm/barrier.h>
 #include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
