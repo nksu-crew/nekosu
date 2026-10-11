@@ -78,7 +78,13 @@ static int ioc_call(int fd, unsigned int flag, void *data, size_t size) {
     memcpy(u.msg.data, data, size);
 
   ret = ioctl(fd, IOC_CMD, &u);
-  if (ret == 0 && size)
+  /*
+   * Copy the payload back on any non-negative return.  Most flags return 0 on
+   * success, but IOC_FEATURE_LIST / IOC_GET_PROFILES return the number of bytes
+   * they wrote, so testing for 0 dropped the whole answer and looked like "the
+   * kernel reported no features".
+   */
+  if (ret >= 0 && size)
     memcpy(data, u.msg.data, size);
 
   return ret;
