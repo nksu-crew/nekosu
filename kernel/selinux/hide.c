@@ -409,7 +409,7 @@ typedef int (*nksu_setprocattr_fn)(const char *name, void *value, size_t size);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 static int (*nksu_bounded_transition_fn)(u32 old_sid, u32 new_sid);
 #else
-static int (*nksu_bounded_transition_fn)(struct selinux_state *state,
+static int (*nksu_bounded_transition_fn)(nksu_fake_state_t *state,
 					  u32 old_sid, u32 new_sid);
 #endif
 
