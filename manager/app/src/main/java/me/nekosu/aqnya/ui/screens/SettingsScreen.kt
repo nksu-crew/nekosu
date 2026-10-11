@@ -128,6 +128,9 @@ fun SettingsScreen(navController: NavController) {
                 },
             )
 
+            // ── 内核功能 ──
+            FeatureSection()
+
             // ── 工具 ──
             ToolsSection(
                 onExportLog = { LogUtils.exportLogs(mContext) },

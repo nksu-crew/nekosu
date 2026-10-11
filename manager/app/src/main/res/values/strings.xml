@@ -18,6 +18,10 @@
     <string name="filter">Filter</string>
     <string name="export_log">export logcat</string>
     <string name="export_log_describe">collect system logs for development.</string>
+    <string name="feature_empty">No kernel features</string>
+    <string name="feature_empty_describe">The kernel module did not report any feature.</string>
+    <string name="feature_selinux_hide">SELinux hiding</string>
+    <string name="feature_selinux_hide_describe">Answer SELinux queries from the policy as it was before the module loaded.</string>
     <string name="close_search">Close Search</string>
     <string name="search_hint">Search app name or package</string>
     <string name="no_app_found">No apps found</string>

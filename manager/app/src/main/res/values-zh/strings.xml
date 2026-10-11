@@ -18,6 +18,10 @@
     <string name="filter">过滤</string>
     <string name="export_log">导出调试日志</string>
     <string name="export_log_describe">收集系统日志用于故障排查</string>
+    <string name="feature_empty">没有可用的内核功能</string>
+    <string name="feature_empty_describe">内核模块没有上报任何 feature</string>
+    <string name="feature_selinux_hide">SELinux 隐藏</string>
+    <string name="feature_selinux_hide_describe">向应用回答模块加载前的原始策略,隐藏注入的域与规则</string>
     <string name="close_search">关闭</string>
     <string name="search_hint">搜索应用或包名</string>
     <string name="no_app_found">未找到应用</string>
