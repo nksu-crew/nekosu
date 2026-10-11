@@ -50,6 +50,7 @@
 #include "manager/feature.h"
 #include "selinux/hide.h"
 #include "selinux/policy.h"
+#include "selinux/selinux.h"
 #include "symbol/symbol.h"
 
 /*
@@ -246,7 +247,7 @@ static struct page *fake_status;
 static void *clean_policy_data;
 static size_t clean_policy_len;
 
-static ssize_t (*policy_read_slot)(struct file *, char __user *, size_t, loff_t *);
+static ssize_t (**policy_read_slot)(struct file *, char __user *, size_t, loff_t *);
 static ssize_t (*orig_policy_read)(struct file *, char __user *, size_t, loff_t *);
 
 /* Bound the capture; a loaded policy blob is a few hundred KiB. */
