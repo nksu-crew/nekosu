@@ -413,6 +413,13 @@ static int (*nksu_bounded_transition_fn)(nksu_fake_state_t *state,
 					  u32 old_sid, u32 new_sid);
 #endif
 
+/*
+ * current_is_single_threaded() is not exported on GKI and is referenced by the
+ * setprocattr hook, so reach it through kallsyms like every other unexported
+ * symbol (a direct reference makes the module fail to load).
+ */
+static bool (*nksu_current_is_single_threaded_fn)(void);
+
 static u32 nksu_cred_sid(const struct cred *cred)
 {
 	return nksu_cred_security(cred)->sid;
@@ -498,10 +505,15 @@ static int __nocfi nksu_setprocattr(const char *name, void *value, size_t size)
 	if (sid == 0)
 		goto abort_change;
 
-	if (!current_is_single_threaded() && nksu_bounded_transition_fn) {
-		error = NKSU_BOUNDED_TRANSITION(tsec->sid, sid);
-		if (error)
-			goto abort_change;
+	if (!nksu_current_is_single_threaded_fn ||
+	    !nksu_current_is_single_threaded_fn()) {
+		/* Multi-threaded (or undetectable): enforce the bounded
+		 * transition, as the stock handler does. */
+		if (nksu_bounded_transition_fn) {
+			error = NKSU_BOUNDED_TRANSITION(tsec->sid, sid);
+			if (error)
+				goto abort_change;
+		}
 	}
 
 	/* Check permissions for the transition. */
@@ -779,6 +791,12 @@ static int nksu_hide_enable(void)
         nksu_ksym_lookup("security_bounded_transition");
     if (!nksu_bounded_transition_fn)
         pr_warn("[selinux_hide] security_bounded_transition not found\n");
+
+    nksu_current_is_single_threaded_fn =
+        (typeof(nksu_current_is_single_threaded_fn))
+            nksu_ksym_lookup("current_is_single_threaded");
+    if (!nksu_current_is_single_threaded_fn)
+        pr_warn("[selinux_hide] current_is_single_threaded not found\n");
 
     ret = nksu_clean_policy_prepare();
     if (ret) {
