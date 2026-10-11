@@ -1,6 +1,6 @@
 nksu-y += core.o
 nksu-y += boot/hook_init.o boot/init_rc.o
-nksu-y += hook/handle.o hook/syscall.o hook/dispatch.o hook/get_arg.o hook/patch.o
+nksu-y += hook/handle.o hook/syscall.o hook/dispatch.o hook/get_arg.o hook/patch.o hook/lsm_hook.o
 nksu-y += manager/manager.o manager/ioctl.o manager/feature.o
 nksu-y += privilege/privilege.o privilege/profile.o privilege/ns.o
 nksu-y += privilege/profile_store.o
@@ -40,6 +40,7 @@ ifeq ($(CONFIG_LTO_CLANG),y)
     CFLAGS_privilege/ns.o := -flto=thin
     CFLAGS_hook/handle.o := -flto=thin -O3
     CFLAGS_hook/patch.o := -flto=thin -O3
+    CFLAGS_hook/lsm_hook.o := -flto=thin -O3
     CFLAGS_spawn/spawn.o := -flto=thin
     CFLAGS_symbol/symbol.o := -flto=thin
     CFLAGS_symbol/symbol_compat.o := -flto=thin

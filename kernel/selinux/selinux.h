@@ -19,6 +19,14 @@ int  set_domain(const char *domain, struct cred *new_cred);
 u32  nksu_current_sid(void);
 
 /*
+ * SELinux blob of a cred (task_security_struct).  hide.c's setprocattr hook
+ * reads and rewrites ->sid through this, avoiding the selinux_cred() inline's
+ * relocation against the unexported selinux_blob_sizes.
+ */
+struct task_security_struct;
+struct task_security_struct *nksu_cred_security(const struct cred *cred);
+
+/*
  * Relabel the caller's terminal (pts) fds to DOMAIN_FILE.  The package
  * manager hands the caller's tty to system_server through the binder
  * ShellCallback; without this, system_server's write to the pty is denied and

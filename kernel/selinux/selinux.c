@@ -65,7 +65,7 @@ bool getenforce(void)
  * layer and add the offsets ourselves.
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0)
-static struct task_security_struct *nksu_cred_security(const struct cred *cred)
+struct task_security_struct *nksu_cred_security(const struct cred *cred)
 {
 	return (struct task_security_struct *)((char *)cred->security +
 					       selinux_blob_sizes.lbs_cred);
@@ -77,7 +77,7 @@ static struct inode_security_struct *nksu_inode_security(const struct inode *ino
 						selinux_blob_sizes.lbs_inode);
 }
 #else
-static struct task_security_struct *nksu_cred_security(const struct cred *cred)
+struct task_security_struct *nksu_cred_security(const struct cred *cred)
 {
 	return (struct task_security_struct *)cred->security;
 }

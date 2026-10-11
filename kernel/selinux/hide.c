@@ -30,6 +30,7 @@
 #include <linux/mm.h>
 #include <linux/mutex.h>
 #include <linux/printk.h>
+#include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/types.h>
@@ -46,6 +47,7 @@
 #include "avc.h"
 #include "objsec.h"
 
+#include "hook/lsm_hook.h"
 #include "hook/patch.h"
 #include "manager/feature.h"
 #include "selinux/hide.h"
@@ -260,6 +262,9 @@ static int (*orig_status_open)(struct inode *, struct file *);
 
 static struct page *fake_status;
 
+/* One lazy retry if the page was not ready when the feature was enabled. */
+static bool fake_status_retry_done;
+
 /* The clean policy, serialised once when the feature is enabled. */
 static void *clean_policy_data;
 static size_t clean_policy_len;
@@ -326,14 +331,29 @@ static int nksu_status_open(struct inode *inode, struct file *filp)
 {
     if (likely(current_uid().val >= 10000 && nksu_hide_running)) {
         void *page;
+        int ret;
 
         mutex_lock(&selinux_state.status_lock);
         page = fake_status;
         mutex_unlock(&selinux_state.status_lock);
+
         if (page) {
             filp->private_data = page;
             return 0;
         }
+
+        /*
+         * The status page is allocated lazily by the stock handler on the
+         * first open, which can happen after the feature is enabled.  Run the
+         * original first so the page exists, then snapshot it for the next
+         * call (mirrors KernelSU's fake_status_initialize_key).
+         */
+        ret = orig_status_open(inode, filp);
+        if (!ret && !fake_status_retry_done) {
+            fake_status_retry_done = true;
+            nksu_fake_status_prepare();
+        }
+        return ret;
     }
     return orig_status_open(inode, filp);
 }
@@ -359,6 +379,159 @@ static void (*context_struct_compute_av_fn)(struct policydb *policydb, struct co
                                             struct extended_perms *xperms) = NULL;
 
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0) */
+
+/*
+ * Kernel-side setprocattr hook, ported from KernelSU's my_setprocattr.
+ *
+ * A su checker (or anything else) writes its SELinux context to
+ * /proc/self/attr/current; the kernel routes that through the LSM setprocattr
+ * hook to selinux_setprocattr().  We answer app uids from the clean policy the
+ * same way the context/access writes above do, while keeping the live
+ * permission checks (SETCURRENT, DYNTRANSITION, ptrace) intact.
+ *
+ * The working policy shares the original policy's sidtab (see
+ * nksu_policy_dup), so the SID resolved here is already valid in the live
+ * policy.  KernelSU needs a second resolve into a separate sidtab for this;
+ * NekoSU does not.
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+#define NKSU_AVC_HAS_PERM(...) avc_has_perm(__VA_ARGS__)
+#define NKSU_BOUNDED_TRANSITION(old, new) nksu_bounded_transition_fn(old, new)
+#else
+#define NKSU_AVC_HAS_PERM(...) avc_has_perm(&selinux_state, __VA_ARGS__)
+#define NKSU_BOUNDED_TRANSITION(old, new) \
+	nksu_bounded_transition_fn(&selinux_state, old, new)
+#endif
+
+typedef int (*nksu_setprocattr_fn)(const char *name, void *value, size_t size);
+
+/* security_bounded_transition(), resolved in nksu_hide_enable(); optional. */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+static int (*nksu_bounded_transition_fn)(u32 old_sid, u32 new_sid);
+#else
+static int (*nksu_bounded_transition_fn)(struct selinux_state *state,
+					  u32 old_sid, u32 new_sid);
+#endif
+
+static u32 nksu_cred_sid(const struct cred *cred)
+{
+	return nksu_cred_security(cred)->sid;
+}
+
+static u32 nksu_task_sid_obj(const struct task_struct *task)
+{
+	u32 sid;
+
+	rcu_read_lock();
+	sid = nksu_cred_sid(__task_cred(task));
+	rcu_read_unlock();
+	return sid;
+}
+
+static u32 nksu_ptrace_parent_sid(void)
+{
+	u32 sid = 0;
+	struct task_struct *tracer;
+
+	rcu_read_lock();
+	tracer = ptrace_parent(current);
+	if (tracer)
+		sid = nksu_task_sid_obj(tracer);
+	rcu_read_unlock();
+	return sid;
+}
+
+static int __nocfi nksu_setprocattr(const char *name, void *value, size_t size);
+
+static struct nksu_lsm_hook nksu_setprocattr_hook = NKSU_LSM_HOOK_INIT(
+	setprocattr, "selinux_setprocattr", nksu_setprocattr, 0);
+
+static int __nocfi nksu_setprocattr(const char *name, void *value, size_t size)
+{
+	struct task_security_struct *tsec;
+	struct cred *new;
+	u32 mysid, sid = 0, ptsid;
+	int error;
+	char *str = value;
+
+	if (likely(current_uid().val < 10000))
+		goto call_orig;
+
+	if (strcmp(name, "current"))
+		goto call_orig;
+
+	mysid = nksu_current_sid();
+	error = NKSU_AVC_HAS_PERM(mysid, mysid, SECCLASS_PROCESS,
+				  PROCESS__SETCURRENT, NULL);
+	if (error)
+		return error;
+
+	/* Obtain a SID for the context, if one was specified. */
+	if (size && str[0] && str[0] != '\n') {
+		if (str[size - 1] == '\n') {
+			str[size - 1] = 0;
+			size--;
+		}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+		error = security_context_to_sid_with_policy(
+			nksu_orig_policy_get(), value, size, &sid, SECSID_NULL,
+			GFP_KERNEL);
+#else
+		error = security_context_to_sid(&fake_state, value, size, &sid,
+						GFP_KERNEL);
+#endif
+		if (error)
+			return error;
+	}
+
+	new = prepare_creds();
+	if (!new)
+		return -ENOMEM;
+
+	/*
+	 * Permission checking based on the specified context is performed
+	 * during the actual operation (execve, open/mkdir/...), when the full
+	 * context is known; see selinux_bprm_creds_for_exec and may_create.
+	 */
+	tsec = nksu_cred_security(new);
+	error = -EINVAL;
+	if (sid == 0)
+		goto abort_change;
+
+	if (!current_is_single_threaded() && nksu_bounded_transition_fn) {
+		error = NKSU_BOUNDED_TRANSITION(tsec->sid, sid);
+		if (error)
+			goto abort_change;
+	}
+
+	/* Check permissions for the transition. */
+	error = NKSU_AVC_HAS_PERM(tsec->sid, sid, SECCLASS_PROCESS,
+				  PROCESS__DYNTRANSITION, NULL);
+	if (error)
+		goto abort_change;
+
+	/* Check for ptracing, and update the task SID if ok.  Otherwise leave
+	 * the SID unchanged and fail. */
+	ptsid = nksu_ptrace_parent_sid();
+	if (ptsid != 0) {
+		error = NKSU_AVC_HAS_PERM(ptsid, sid, SECCLASS_PROCESS,
+					  PROCESS__PTRACE, NULL);
+		if (error)
+			goto abort_change;
+	}
+
+	tsec->sid = sid;
+	commit_creds(new);
+	return size;
+
+abort_change:
+	abort_creds(new);
+	return error;
+
+call_orig:
+	return ((nksu_setprocattr_fn)nksu_setprocattr_hook.original)(name, value,
+								     size);
+}
 
 static ssize_t nksu_write_context(struct file *file, char *buf, size_t size)
 {
@@ -566,6 +739,8 @@ static void nksu_hide_unhook(void)
         policy_read_slot = NULL;
         orig_policy_read = NULL;
     }
+
+    nksu_lsm_unhook(&nksu_setprocattr_hook);
 }
 
 static int nksu_hide_enable(void)
@@ -599,6 +774,11 @@ static int nksu_hide_enable(void)
     fake_state.initialized = true;
     fake_state.policy = nksu_orig_policy_get();
 #endif
+
+    nksu_bounded_transition_fn = (typeof(nksu_bounded_transition_fn))
+        nksu_ksym_lookup("security_bounded_transition");
+    if (!nksu_bounded_transition_fn)
+        pr_warn("[selinux_hide] security_bounded_transition not found\n");
 
     ret = nksu_clean_policy_prepare();
     if (ret) {
@@ -659,7 +839,15 @@ static int nksu_hide_enable(void)
         pr_warn("[selinux_hide] sel_handle_status_ops not found\n");
     }
 
+    fake_status_retry_done = false;
     nksu_fake_status_prepare();
+
+    ret = nksu_lsm_hook(&nksu_setprocattr_hook);
+    if (ret) {
+        pr_err("[selinux_hide] setprocattr hook: %d\n", ret);
+        goto fail;
+    }
+
     pr_info("[selinux_hide] enabled\n");
     return 0;
 
