@@ -30,7 +30,7 @@ int hook_and_save(int nr, syscall_fn_t new_fn, const char *tag)
     if ((unsigned int)nr >= (unsigned int)__NR_syscalls)
         return -EINVAL;
 
-    ret = hook_save(nr, new_fn, &orig, tag);
+    ret = syscall_slot_hook(nr, new_fn, &orig, tag);
     if (ret)
         return ret;
 
@@ -135,7 +135,7 @@ int nksu_dispatch_init(void)
 
     nksu_dispatch_set_unconditional(false);
 
-    rc = syscalltable_init();
+    rc = syscall_table_resolve();
     if (rc < 0)
         return rc;
 
@@ -144,14 +144,14 @@ int nksu_dispatch_init(void)
 
     nksu_syscall_nr = find_random_ni_slot();
     if (nksu_syscall_nr < 0) {
-        syscalltable_exit();
+        syscall_slots_restore_all();
         return -ENOENT;
     }
 
     ret = hook_and_save(nksu_syscall_nr, nksu_dispatch_fast, "nksu_dispatch_fast");
     if (ret) {
         nksu_syscall_nr = -1;
-        syscalltable_exit();
+        syscall_slots_restore_all();
     }
     return ret;
 }
@@ -163,7 +163,7 @@ void nksu_dispatch_exit(void)
     if (nksu_syscall_nr < 0)
         return;
 
-    syscalltable_exit();
+    syscall_slots_restore_all();
 
     memset(nksu_orig_table, 0, sizeof(nksu_orig_table));
     memset(virt_table, 0, sizeof(virt_table));

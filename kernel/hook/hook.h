@@ -25,6 +25,5 @@ static inline bool path_is_su(const char *p)
 }
 
 int init_syscall_hook(void);
-void exit_syscall_hook(void);
 
 #endif

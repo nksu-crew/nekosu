@@ -236,13 +236,13 @@ int nksu_init_rc_init(void)
 {
     int ret;
 
-    ret = hook_save(__NR_read, nksu_sys_read, &nksu_orig_read_sys, "nksu_rc_read");
+    ret = syscall_slot_hook(__NR_read, nksu_sys_read, &nksu_orig_read_sys, "nksu_rc_read");
     if (ret) {
         pr_err("nksu: cannot hook __NR_read: %d\n", ret);
         return ret;
     }
 
-    ret = hook_save(__NR_fstat, nksu_sys_fstat, &nksu_orig_fstat_sys, "nksu_rc_fstat");
+    ret = syscall_slot_hook(__NR_fstat, nksu_sys_fstat, &nksu_orig_fstat_sys, "nksu_rc_fstat");
     if (ret) {
         pr_err("nksu: cannot hook __NR_fstat: %d\n", ret);
         return ret;
@@ -254,5 +254,5 @@ int nksu_init_rc_init(void)
 /*
  * There is no nksu_init_rc_exit(): the read/fstat syscall hops are torn down
  * together with the temporary boot watcher (nksu_dispatch_exit ->
- * syscalltable_exit), so there is nothing to unhook.
+ * syscall_slots_restore_all), so there is nothing to unhook.
  */

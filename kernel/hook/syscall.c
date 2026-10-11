@@ -16,7 +16,7 @@ syscall_fn_t *syscall_table;
 
 struct hook_entry {
     unsigned long addr;
-    syscall_fn_t original;
+    syscall_fn_t previous;
 };
 
 static struct hook_entry hook_table[MAX_HOOKS];
@@ -27,12 +27,12 @@ static DEFINE_SPINLOCK(hook_lock);
  * Replacing a slot goes through hook/patch.c, the single owner of the
  * text-patch primitive (and of init_mm).  Do not add a second patcher here.
  */
-static int patch_syscall_slot(void *addr, syscall_fn_t newval)
+static int patch_slot(void *addr, syscall_fn_t newval)
 {
     return nksu_patch_text(addr, &newval, sizeof(newval));
 }
 
-static int syscalltable_hook(unsigned long addr, syscall_fn_t hook_fn)
+static int record_slot(unsigned long addr, syscall_fn_t hook_fn)
 {
     unsigned long flags;
     int ret;
@@ -43,11 +43,11 @@ static int syscalltable_hook(unsigned long addr, syscall_fn_t hook_fn)
         return -ENOMEM;
     }
     hook_table[hook_count].addr = addr;
-    hook_table[hook_count].original = *(syscall_fn_t *)addr;
+    hook_table[hook_count].previous = *(syscall_fn_t *)addr;
     hook_count++;
     spin_unlock_irqrestore(&hook_lock, flags);
 
-    ret = patch_syscall_slot((void *)addr, hook_fn);
+    ret = patch_slot((void *)addr, hook_fn);
     if (ret) {
         spin_lock_irqsave(&hook_lock, flags);
         hook_count--;
@@ -57,10 +57,10 @@ static int syscalltable_hook(unsigned long addr, syscall_fn_t hook_fn)
     return ret;
 }
 
-static int syscalltable_unhook(unsigned long addr)
+static int restore_slot(unsigned long addr)
 {
     unsigned long flags;
-    syscall_fn_t orig;
+    syscall_fn_t previous;
     int i, ret;
 
     spin_lock_irqsave(&hook_lock, flags);
@@ -70,61 +70,53 @@ static int syscalltable_unhook(unsigned long addr)
     }
     if (i == hook_count) {
         spin_unlock_irqrestore(&hook_lock, flags);
-        pr_err("nksu: unhook addr not found\n");
+        pr_err("nksu: restore: slot not recorded\n");
         return -ENOENT;
     }
-    orig = hook_table[i].original;
+    previous = hook_table[i].previous;
     hook_table[i] = hook_table[--hook_count];
     spin_unlock_irqrestore(&hook_lock, flags);
 
-    ret = patch_syscall_slot((void *)addr, orig);
+    ret = patch_slot((void *)addr, previous);
     if (ret)
-        pr_err("nksu: unhook patch failed: %d\n", ret);
+        pr_err("nksu: restore patch failed: %d\n", ret);
     return ret;
 }
 
-static syscall_fn_t syscalltable_get_original(unsigned long addr)
+static syscall_fn_t recorded_previous(unsigned long addr)
 {
     unsigned long flags;
-    syscall_fn_t orig = NULL;
+    syscall_fn_t previous = NULL;
     int i;
 
     spin_lock_irqsave(&hook_lock, flags);
     for (i = 0; i < hook_count; i++) {
         if (hook_table[i].addr == addr) {
-            orig = hook_table[i].original;
+            previous = hook_table[i].previous;
             break;
         }
     }
     spin_unlock_irqrestore(&hook_lock, flags);
-    return orig;
+    return previous;
 }
 
-int hook_save(int nr, syscall_fn_t fn, syscall_fn_t *orig, const char *name)
+int syscall_slot_hook(int nr, syscall_fn_t fn, syscall_fn_t *previous,
+                      const char *tag)
 {
     unsigned long addr = (unsigned long)&syscall_table[nr];
-    int ret = syscalltable_hook(addr, fn);
+    int ret = record_slot(addr, fn);
+
     if (ret) {
-        pr_err("nksu: failed to hook %s: %d\n", name, ret);
+        pr_err("nksu: failed to hook %s: %d\n", tag, ret);
         return ret;
     }
-    *orig = syscalltable_get_original(addr);
-    pr_info("nksu: hooked %s\n", name);
+    if (previous)
+        *previous = recorded_previous(addr);
+    pr_info("nksu: hooked %s\n", tag);
     return 0;
 }
 
-int hook_nosave(int nr, syscall_fn_t fn, const char* name){
-    unsigned long addr = (unsigned long)&syscall_table[nr];
-    int ret = syscalltable_hook(addr, fn);
-    if (ret) {
-        pr_err("nksu: failed to hook %s: %d\n", name, ret);
-        return ret;
-    }
-    pr_info("nksu: hooked %s\n", name);
-    return 0;
-}
-
-int syscalltable_init(void)
+int syscall_table_resolve(void)
 {
     /*
      * init_mm belongs to the patcher (hook/patch.c); failing here keeps
@@ -146,8 +138,8 @@ int syscalltable_init(void)
     return 0;
 }
 
-void syscalltable_exit(void)
+void syscall_slots_restore_all(void)
 {
     while (hook_count > 0)
-        syscalltable_unhook(hook_table[hook_count - 1].addr);
+        restore_slot(hook_table[hook_count - 1].addr);
 }
