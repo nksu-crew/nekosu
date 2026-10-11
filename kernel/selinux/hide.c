@@ -65,6 +65,23 @@ typedef struct selinux_state nksu_fake_state_t;
 /* Last: redirects unexported symbols (selinux_state, ...) through pointers. */
 #include "symbol/symbol_compat.h"
 
+/*
+ * This file calls several resolved-but-unexported kernel functions through
+ * pointers (policydb_write, avc_has_perm, security_*_to_sid, and the saved
+ * f_op handlers), exactly like selinux.c / policy.c / rule.c / manager.c, so it
+ * disables CFI for its own functions the same way they do.  Without it the
+ * first indirect call panics with "CFI failure (target: policydb_write)" when
+ * the module was built by a different clang than the running kernel.
+ *
+ * Note this only drops the checks at *our* call sites: the compiler still
+ * emits the .cfi_jt stub for address-taken functions, so the handlers nksu
+ * installs into selinuxfs f_ops remain valid targets for the kernel's own
+ * indirect calls.
+ */
+#if defined(__clang__)
+#pragma clang attribute push(__attribute__((no_sanitize("cfi"))), apply_to=function)
+#endif
+
 /* Its presence at boot turns the feature on. */
 #define NKSU_FEATURE_FLAG "/data/adb/nksu/feature"
 
@@ -1353,3 +1370,7 @@ allow:
 }
 
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0) */
+
+#if defined(__clang__)
+#pragma clang attribute pop
+#endif
