@@ -20,4 +20,17 @@ bool is_ncore_ready(void);
  * failed verification (or a reinstall that changes the UID). */
 bool is_manager_uid(uid_t uid);
 
+struct cred;
+
+/*
+ * Borrow a cred switched to the nksu domain (load_policy() grants it
+ * allow-any-any) while touching /data/system or /data/adb from a context that
+ * the kernel SELinux domain cannot read.  Pair every begin with an end.
+ */
+const struct cred *nksu_scan_creds_begin(void);
+void nksu_scan_creds_end(const struct cred *old);
+
+/* True when `path` exists, checked under the nksu scan creds. */
+bool nksu_file_exists(const char *path);
+
 #endif /* NKSU_MANAGER_H */

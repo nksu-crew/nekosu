@@ -9,6 +9,7 @@
 #include <linux/string.h>
 
 #include "fmac.h"
+#include "manager/feature.h"
 #include "manager/ioctl.h"
 #include "nksu.h"
 #include "privilege/profile_store.h"
@@ -205,6 +206,68 @@ static long ioc_get_version(void __user *data, unsigned int size)
     return copy_to_user(data, version, len) ? -EFAULT : 0;
 }
 
+/* Serialize the registered features for the manager's JNI query. */
+static long ioc_feature_list(void __user *data, unsigned int size)
+{
+    char *buf;
+    int len;
+
+    if (!data || size == 0 || size > NKSU_FEATURE_TEXT_MAX)
+        return -EINVAL;
+
+    buf = kzalloc(size, GFP_KERNEL);
+    if (!buf)
+        return -ENOMEM;
+
+    len = nksu_feature_render(buf, size - 1);
+    if (len < 0) {
+        kfree(buf);
+        return len;
+    }
+    buf[size - 1] = '\0';
+    if (copy_to_user(data, buf, (size_t)len + 1))
+        len = -EFAULT;
+
+    kfree(buf);
+    return len;
+}
+
+static long ioc_feature_get(void __user *data, unsigned int size)
+{
+    u32 id;
+    u64 value = 0;
+    int ret;
+
+    if (!data || size < FMAC_DATA_FEATURE)
+        return -EINVAL;
+    if (copy_from_user(&id, data, sizeof(id)))
+        return -EFAULT;
+
+    ret = nksu_feature_get(id, &value);
+    if (ret)
+        return ret;
+
+    if (copy_to_user((char __user *)data + FMAC_OFF_FEATURE_VALUE, &value,
+                     sizeof(value)))
+        return -EFAULT;
+    return 0;
+}
+
+static long ioc_feature_set(void __user *data, unsigned int size)
+{
+    u32 id;
+    u64 value;
+
+    if (!data || size < FMAC_DATA_FEATURE)
+        return -EINVAL;
+    if (copy_from_user(&id, data, sizeof(id)) ||
+        copy_from_user(&value, (const char __user *)data + FMAC_OFF_FEATURE_VALUE,
+                       sizeof(value)))
+        return -EFAULT;
+
+    return nksu_feature_set(id, value);
+}
+
 static long fmac_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
     struct fmac_ioc ioc;
@@ -247,6 +310,12 @@ static long fmac_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         return ioc_get_profiles((void __user *)data, ioc.size);
     case IOC_GET_VERSION:
         return ioc_get_version((void __user *)data, ioc.size);
+    case IOC_FEATURE_LIST:
+        return ioc_feature_list((void __user *)data, ioc.size);
+    case IOC_FEATURE_GET:
+        return ioc_feature_get((void __user *)data, ioc.size);
+    case IOC_FEATURE_SET:
+        return ioc_feature_set((void __user *)data, ioc.size);
     default:
         return -ENOTTY;
     }

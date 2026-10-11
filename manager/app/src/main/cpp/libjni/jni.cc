@@ -51,7 +51,7 @@ private:
   const char *cstr_;
 };
 
-#define FMAC_MAX_DATA FMAC_DATA_SELRULE
+#define FMAC_MAX_DATA 4096
 
 namespace jni {
 namespace {
@@ -656,6 +656,93 @@ static jstring moduleVersion(JNIEnv *env, jobject thiz) {
   buf[sizeof(buf) - 1] = '\0';
   return env->NewStringUTF(buf);
 }
+/*
+ * Kernel feature toggles (IOC_FEATURE_*).  featureList() returns the
+ * "<id> <name> <value>" text the kernel renders, so the manager can show which
+ * features exist and whether they are on; featureGet/featureSet act on one.
+ * The wire layout is a uint32 id followed by a uint64 value, matching
+ * FMAC_OFF_FEATURE_VALUE.
+ */
+static jstring featureList(JNIEnv *env, jobject thiz) {
+  (void)thiz;
+
+  if (ctlfd < 0) {
+    if (Ctl(OP_IOCTL) >= 0) {
+      const int f = ScanCtlFd();
+      if (f >= 0)
+        ctlfd = f;
+    }
+  }
+  if (ctlfd < 0) {
+    LOG_ERR("featureList: control fd unavailable");
+    return nullptr;
+  }
+
+  char buf[1024];
+  memset(buf, 0, sizeof(buf));
+  if (ioc_call(ctlfd, IOC_FEATURE_LIST, buf, sizeof(buf)) < 0) {
+    LOG_ERR("featureList failed: %s", strerror(errno));
+    return nullptr;
+  }
+  buf[sizeof(buf) - 1] = '\0';
+  return env->NewStringUTF(buf);
+}
+
+static jlong featureGet(JNIEnv *env, jobject thiz, jint id) {
+  (void)env;
+  (void)thiz;
+
+  if (ctlfd < 0) {
+    if (Ctl(OP_IOCTL) >= 0) {
+      const int f = ScanCtlFd();
+      if (f >= 0)
+        ctlfd = f;
+    }
+  }
+  if (ctlfd < 0)
+    return -1;
+
+  uint8_t payload[FMAC_DATA_FEATURE];
+  uint32_t fid = (uint32_t)id;
+  uint64_t value = 0;
+  memcpy(payload, &fid, sizeof(fid));
+  memcpy(payload + FMAC_OFF_FEATURE_VALUE, &value, sizeof(value));
+
+  if (ioc_call(ctlfd, IOC_FEATURE_GET, payload, sizeof(payload)) < 0) {
+    LOG_ERR("featureGet(%d) failed: %s", id, strerror(errno));
+    return -1;
+  }
+  memcpy(&value, payload + FMAC_OFF_FEATURE_VALUE, sizeof(value));
+  return (jlong)value;
+}
+
+static jint featureSet(JNIEnv *env, jobject thiz, jint id, jlong value) {
+  (void)env;
+  (void)thiz;
+
+  if (ctlfd < 0) {
+    if (Ctl(OP_IOCTL) >= 0) {
+      const int f = ScanCtlFd();
+      if (f >= 0)
+        ctlfd = f;
+    }
+  }
+  if (ctlfd < 0)
+    return -1;
+
+  uint8_t payload[FMAC_DATA_FEATURE];
+  uint32_t fid = (uint32_t)id;
+  uint64_t fvalue = (uint64_t)value;
+  memcpy(payload, &fid, sizeof(fid));
+  memcpy(payload + FMAC_OFF_FEATURE_VALUE, &fvalue, sizeof(fvalue));
+
+  if (ioc_call(ctlfd, IOC_FEATURE_SET, payload, sizeof(payload)) < 0) {
+    LOG_ERR("featureSet(%d, %lld) failed: %s", id, (long long)value,
+            strerror(errno));
+    return -1;
+  }
+  return 0;
+}
 } // namespace ncore
 
 const JNINativeMethod gMethods[] = {
@@ -679,6 +766,9 @@ const JNINativeMethod gMethods[] = {
     {"isGki", "()Z", (void *)ncore::isGki},
     {"kernelVersion", "()Ljava/lang/String;", (void *)ncore::kernelVersion},
     {"moduleVersion", "()Ljava/lang/String;", (void *)ncore::moduleVersion},
+    {"featureList", "()Ljava/lang/String;", (void *)ncore::featureList},
+    {"featureGet", "(I)J", (void *)ncore::featureGet},
+    {"featureSet", "(IJ)I", (void *)ncore::featureSet},
 };
 
 static int registerNativeMethods(JNIEnv *env) {

@@ -24,6 +24,9 @@ enum fmac_flag {
   IOC_SET_SEPOLICY = 12, /* data = KernelSU-format sepolicy batch, size = length */
   IOC_GET_PROFILES = 13, /* data[<=64KiB] out = profile table as text */
   IOC_GET_VERSION = 14,  /* data[<=64] out = kernel module build version */
+  IOC_FEATURE_LIST = 15, /* data[<=1024] out = "<id> <name> <value>" lines */
+  IOC_FEATURE_GET = 16,  /* data[12] = uint32_t id (in) | uint64_t value (out) */
+  IOC_FEATURE_SET = 17,  /* data[12] = uint32_t id | uint64_t value */
 };
 
 struct fmac_ioc {
@@ -38,6 +41,7 @@ struct fmac_ioc {
 #define FMAC_DATA_CAP 12
 #define FMAC_DATA_SELRULE 264
 #define FMAC_DATA_PROFILE 80
+#define FMAC_DATA_FEATURE 12
 
 #define FMAC_OFF_UID 0
 #define FMAC_OFF_CAPS 4
@@ -48,5 +52,6 @@ struct fmac_ioc {
 #define FMAC_OFF_PERM 192
 #define FMAC_OFF_EFFECT 256
 #define FMAC_OFF_INVERT 260
+#define FMAC_OFF_FEATURE_VALUE 4
 
 #endif /* FMAC_IOCTL_H */

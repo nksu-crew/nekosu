@@ -14,6 +14,7 @@
 #include "nksu.h"
 #include "boot/init.h"
 #include "privilege/profile_store.h"
+#include "selinux/hide.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Aqnya");
@@ -61,6 +62,11 @@ static const module_component_t feature_components[] = {
         .name = "profile store",
         .init = nksu_profile_store_init,
         .exit = nksu_profile_store_exit,
+    },
+    {
+        .name = "SELinux hide",
+        .init = nksu_selinux_hide_init,
+        .exit = nksu_selinux_hide_exit,
     },
 #ifndef CONFIG_NKSU_SYSCALL
     {

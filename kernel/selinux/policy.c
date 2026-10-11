@@ -48,6 +48,11 @@
 static struct selinux_policy *nksu_orig_policy __read_mostly;
 static struct selinux_policy *nksu_work_policy __read_mostly;
 
+struct selinux_policy *nksu_orig_policy_get(void)
+{
+	return nksu_orig_policy;
+}
+
 /*
  * Independent deep-copy of a selinux_policy via the policydb (de)serializer,
  * exactly like KernelSU's ksu_dup_sepolicy.  This is what makes mutation and

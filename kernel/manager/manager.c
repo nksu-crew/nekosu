@@ -584,7 +584,7 @@ static int mark_zygote(void)
  */
 static struct cred *nksu_scan_cred;
 
-static const struct cred *nksu_scan_creds_begin(void)
+const struct cred *nksu_scan_creds_begin(void)
 {
     if (!nksu_scan_cred) {
         struct cred *cred = prepare_creds();
@@ -607,7 +607,7 @@ static const struct cred *nksu_scan_creds_begin(void)
     return override_creds(nksu_scan_cred);
 }
 
-static void nksu_scan_creds_end(const struct cred *old)
+void nksu_scan_creds_end(const struct cred *old)
 {
     if (old)
         revert_creds(old);
@@ -638,6 +638,19 @@ static bool kfile_exists(const char *path)
         return false;
     filp_close(f, NULL);
     return true;
+}
+
+/* Same check, but reachable from other subsystems that run outside the nksu
+ * domain (e.g. the SELinux hiding feature reading /data/adb/nksu/feature). */
+bool nksu_file_exists(const char *path)
+{
+    const struct cred *old;
+    bool found;
+
+    old = nksu_scan_creds_begin();
+    found = kfile_exists(path);
+    nksu_scan_creds_end(old);
+    return found;
 }
 
 /* mkdir one leaf whose parent already exists. */

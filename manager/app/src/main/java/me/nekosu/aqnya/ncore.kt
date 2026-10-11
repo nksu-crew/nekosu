@@ -70,4 +70,16 @@ object ncore {
 
     /** 运行中内核模块（nksu.ko）的构建版本，用于和 APK 版本比对。 */
     external fun moduleVersion(): String?
+
+    /** 内核 feature 列表，每行 `<id> <name> <value>`；失败返回 null。 */
+    external fun featureList(): String?
+
+    /** 查询单个 feature 的值；失败返回 -1。 */
+    external fun featureGet(id: Int): Long
+
+    /** 开关 feature（value 非 0 开启）；成功返回 0。 */
+    external fun featureSet(
+        id: Int,
+        value: Long,
+    ): Int
 }

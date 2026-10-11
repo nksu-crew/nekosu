@@ -44,9 +44,18 @@ enum {
      * flashed LKM.
      */
     IOC_GET_VERSION = 14,
+    /*
+     * Kernel feature toggles (see manager/feature.h).  LIST serialises the
+     * registered features as "<id> <name> <value>\n" lines; GET/SET act on a
+     * single feature id.  Backs the manager's JNI feature query/toggle.
+     */
+    IOC_FEATURE_LIST = 15, /* data[<= NKSU_FEATURE_TEXT_MAX] out = feature table */
+    IOC_FEATURE_GET = 16,  /* data[12] = uint32_t id (in) | uint64_t value (out) */
+    IOC_FEATURE_SET = 17,  /* data[12] = uint32_t id | uint64_t value */
 };
 
 #define NKSU_PROFILE_TEXT_MAX (64 * 1024)
+#define NKSU_FEATURE_TEXT_MAX 1024
 
 struct fmac_ioc {
     unsigned int flag;
@@ -61,6 +70,7 @@ struct fmac_ioc {
 #define FMAC_DATA_CAP       12
 #define FMAC_DATA_SELRULE   264
 #define FMAC_DATA_PROFILE   80
+#define FMAC_DATA_FEATURE   12
 
 /*
  * prctl opcodes.  201 and 203 are reserved for the manager (is_manager-gated);
@@ -78,6 +88,7 @@ struct fmac_ioc {
 #define FMAC_OFF_PERM    192
 #define FMAC_OFF_EFFECT  256
 #define FMAC_OFF_INVERT  260
+#define FMAC_OFF_FEATURE_VALUE 4
 
 /*
  * The flag payloads are a wire contract shared with the manager, and the
@@ -100,6 +111,8 @@ static_assert(FMAC_OFF_PERM == FMAC_OFF_CLS + 64, "rule cls/perm layout");
 static_assert(FMAC_OFF_EFFECT == FMAC_OFF_PERM + 64, "rule perm/effect layout");
 static_assert(FMAC_OFF_INVERT == FMAC_OFF_EFFECT + sizeof(int), "rule effect/invert layout");
 static_assert(FMAC_DATA_SELRULE == FMAC_OFF_INVERT + sizeof(int), "selrule payload size");
+static_assert(FMAC_OFF_FEATURE_VALUE == FMAC_DATA_UID, "feature id/value layout");
+static_assert(FMAC_DATA_FEATURE == FMAC_OFF_FEATURE_VALUE + sizeof(u64), "feature payload size");
 
 static inline kernel_cap_t u64_to_cap(u64 v)
 {
