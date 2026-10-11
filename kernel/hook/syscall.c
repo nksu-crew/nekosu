@@ -1,21 +1,15 @@
 #include <linux/kallsyms.h>
-#include <asm/syscall.h>
-#include <linux/mm.h>
-#include <asm/ptrace.h>
-#include <asm/tlbflush.h>
-#include <asm/fixmap.h>
-#include <asm/pgtable.h>
+#include <linux/printk.h>
 #include <linux/spinlock.h>
-#include <linux/vmalloc.h>
-#include <linux/stop_machine.h>
-#include <linux/uaccess.h>
-#include <linux/atomic.h>
-#include <linux/cpumask.h>
+#include <asm/syscall.h>
 
 #include <fmac.h>
+#include "hook/patch.h"
+#include "hook/syscall.h"
+#include "symbol/symbol.h"
+/* Last: redirects unexported symbols through resolved pointers. */
 #include "symbol/symbol_compat.h"
 
-static struct mm_struct *init_mm_ptr;
 syscall_fn_t *syscall_table;
 
 #define MAX_HOOKS 256
@@ -29,107 +23,13 @@ static struct hook_entry hook_table[MAX_HOOKS];
 static int hook_count = 0;
 static DEFINE_SPINLOCK(hook_lock);
 
-static unsigned long phys_from_virt(unsigned long addr, int *err)
-{
-    pgd_t *pgd;
-    p4d_t *p4d;
-    pud_t *pud;
-    pmd_t *pmd;
-    pte_t *pte;
-
-    *err = 0;
-
-    pgd = pgd_offset(init_mm_ptr, addr);
-    if (pgd_none(*pgd) || pgd_bad(*pgd))
-        goto fail;
-
-    p4d = p4d_offset(pgd, addr);
-    if (p4d_none(*p4d) || p4d_bad(*p4d))
-        goto fail;
-
-    pud = pud_offset(p4d, addr);
-    if (pud_none(*pud) || pud_bad(*pud))
-        goto fail;
-#if defined(pud_leaf)
-    if (pud_leaf(*pud))
-        return __pud_to_phys(*pud) + (addr & ~PUD_MASK);
-#endif
-
-    pmd = pmd_offset(pud, addr);
-#if defined(pmd_leaf)
-    if (pmd_leaf(*pmd))
-        return __pmd_to_phys(*pmd) + (addr & ~PMD_MASK);
-#endif
-    if (pmd_none(*pmd) || pmd_bad(*pmd))
-        goto fail;
-
-    pte = pte_offset_kernel(pmd, addr);
-    if (!pte || !pte_present(*pte))
-        goto fail;
-
-    return __pte_to_phys(*pte) + (addr & ~PAGE_MASK);
-
-fail:
-    *err = -ENOENT;
-    return 0;
-}
-
-struct patch_info {
-    void *dst;
-    syscall_fn_t newval;
-    atomic_t cpu_count;
-    int result;
-};
-
-static __nocfi int do_patch_nosync(struct patch_info *p)
-{
-    unsigned long addr = (unsigned long)p->dst;
-    unsigned long phy;
-    void *map;
-    int err;
-
-    phy = phys_from_virt(addr, &err);
-    if (err) {
-        pr_err("nksu: phys_from_virt failed for 0x%lx\n", addr);
-        return err;
-    }
-
-    map = (void *)set_fixmap_offset(FIX_TEXT_POKE0, phy);
-    err = (int)copy_to_kernel_nofault(map, &p->newval, sizeof(syscall_fn_t));
-    clear_fixmap(FIX_TEXT_POKE0);
-
-    if (!err) {
-        dsb(ish);
-        isb();
-    }
-    return err;
-}
-
-static int patch_text_cb(void *arg)
-{
-    struct patch_info *p = arg;
-
-    if (atomic_inc_return(&p->cpu_count) == num_online_cpus()) {
-        p->result = do_patch_nosync(p);
-        atomic_inc(&p->cpu_count);
-    } else {
-        while (atomic_read(&p->cpu_count) <= num_online_cpus())
-            cpu_relax();
-        isb();
-    }
-    return 0;
-}
-
+/*
+ * Replacing a slot goes through hook/patch.c, the single owner of the
+ * text-patch primitive (and of init_mm).  Do not add a second patcher here.
+ */
 static int patch_syscall_slot(void *addr, syscall_fn_t newval)
 {
-    struct patch_info p = {
-        .dst = addr,
-        .newval = newval,
-        .cpu_count = ATOMIC_INIT(0),
-        .result = 0,
-    };
-    int ret = stop_machine(patch_text_cb, &p, cpu_online_mask);
-    return ret ? ret : p.result;
+    return nksu_patch_text(addr, &newval, sizeof(newval));
 }
 
 static int syscalltable_hook(unsigned long addr, syscall_fn_t hook_fn)
@@ -226,11 +126,17 @@ int hook_nosave(int nr, syscall_fn_t fn, const char* name){
 
 int syscalltable_init(void)
 {
-    init_mm_ptr = (struct mm_struct *)nksu_ksym_lookup("init_mm");
-    if (!init_mm_ptr) {
+    /*
+     * init_mm belongs to the patcher (hook/patch.c); failing here keeps
+     * nksu_dispatch_init() erroring out early when the kernel cannot be
+     * patched at all.
+     */
+    int ret = nksu_patch_init();
+    if (ret) {
         pr_err("nksu: failed to find init_mm\n");
-        return -ENOENT;
+        return ret;
     }
+
     syscall_table = (syscall_fn_t *)nksu_ksym_lookup("sys_call_table");
     if (!syscall_table) {
         pr_err("nksu: failed to find sys_call_table\n");

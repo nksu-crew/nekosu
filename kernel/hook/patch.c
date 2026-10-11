@@ -128,6 +128,15 @@ static int nksu_patch_cb(void *arg)
     return 0;
 }
 
+int nksu_patch_init(void)
+{
+    if (nksu_patch_init_mm)
+        return 0;
+
+    nksu_patch_init_mm = (struct mm_struct *)nksu_ksym_lookup("init_mm");
+    return nksu_patch_init_mm ? 0 : -ENOENT;
+}
+
 int nksu_patch_text(void *slot, const void *newval, size_t size)
 {
     struct nksu_patch_info p = {
@@ -142,11 +151,10 @@ int nksu_patch_text(void *slot, const void *newval, size_t size)
     if (!slot || !newval || !size)
         return -EINVAL;
 
-    if (!nksu_patch_init_mm)
-        nksu_patch_init_mm = (struct mm_struct *)nksu_ksym_lookup("init_mm");
-    if (!nksu_patch_init_mm) {
+    ret = nksu_patch_init();
+    if (ret) {
         pr_err("nksu: patch: init_mm unavailable\n");
-        return -ENOENT;
+        return ret;
     }
 
     ret = stop_machine(nksu_patch_cb, &p, cpu_online_mask);
