@@ -5,14 +5,12 @@ import me.nekosu.aqnya.ncore
 /**
  * 内核 feature（控制 fd 上的 `IOC_FEATURE_*`）的管理器侧封装。
  *
- * 内核只在开机时读 `/data/adb/nksu/feature` 决定默认开关，所以运行时切换要同时
- * 落盘这个标志文件，重启后才保持。
+ * 持久化由内核负责：内核在切换时自己写/删 `/data/adb/nksu/feature`，开机再读回来
+ * 自动启用。管理器只做即时切换与展示，不碰那个文件。
  */
 object KernelFeature {
     /** 与 kernel/manager/feature.h 的 NKSU_FEATURE_SELINUX_HIDE 对应。 */
     const val SELINUX_HIDE = 1
-
-    private const val BOOT_FLAG = "/data/adb/nksu/feature"
 
     data class Info(
         val id: Int,
@@ -37,20 +35,12 @@ object KernelFeature {
             }?.toList()
             .orEmpty()
 
-    /** 运行时开关（并按需落盘开机标志）；成功返回 true。 */
+    /** 运行时开关；成功返回 true。 */
     fun set(
         id: Int,
         enabled: Boolean,
     ): Boolean {
-        val ret =
-            runCatching { ncore.featureSet(id, if (enabled) 1L else 0L) }.getOrNull()
-                ?: return false
-        if (ret != 0) return false
-
-        // SELinux 隐藏靠这个文件在开机时自动启用。
-        if (id == SELINUX_HIDE) {
-            runCatching { RootShell.exec(if (enabled) "touch $BOOT_FLAG" else "rm -f $BOOT_FLAG") }
-        }
-        return true
+        val ret = runCatching { ncore.featureSet(id, if (enabled) 1L else 0L) }.getOrNull() ?: return false
+        return ret == 0
     }
 }

@@ -22,6 +22,10 @@
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
+#include <linux/namei.h>
+#include <linux/dcache.h>
+#include <linux/mount.h>
+#include <linux/path.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/mutex.h>
@@ -120,6 +124,82 @@ static bool nksu_feature_flag_present(void)
 
     hide_creds_end(old);
     return present;
+}
+
+/* Unlink one leaf whose parent is a directory (mirrors kdir_mkdir in manager.c). */
+static int kfile_unlink(const char *path)
+{
+    char parent[256];
+    const char *slash;
+    struct path p;
+    struct inode *dir;
+    struct dentry *dentry;
+    size_t len;
+    int err;
+
+    slash = strrchr(path, '/');
+    if (!slash || slash == path)
+        return -EINVAL;
+
+    len = (size_t)(slash - path);
+    if (len >= sizeof(parent))
+        return -ENAMETOOLONG;
+    memcpy(parent, path, len);
+    parent[len] = '\0';
+
+    err = kern_path(parent, LOOKUP_DIRECTORY | LOOKUP_FOLLOW, &p);
+    if (err)
+        return err;
+
+    dir = d_inode(p.dentry);
+    inode_lock_nested(dir, I_MUTEX_PARENT);
+    dentry = lookup_one_len(slash + 1, p.dentry, (int)strlen(slash + 1));
+    if (IS_ERR(dentry)) {
+        err = PTR_ERR(dentry);
+    } else {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+        err = vfs_unlink(mnt_idmap(p.mnt), dir, dentry, NULL);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+        err = vfs_unlink(mnt_user_ns(p.mnt), dir, dentry, NULL);
+#else
+        err = vfs_unlink(dir, dentry, NULL);
+#endif
+        dput(dentry);
+    }
+    inode_unlock(dir);
+    path_put(&p);
+    return err;
+}
+
+/*
+ * Persist the switch so the kernel turns the feature on/off by itself next
+ * boot.  The flag file is the boot-time source of truth (see
+ * nksu_feature_flag_present), so the manager does not touch it.
+ */
+static void nksu_feature_flag_store(bool enabled)
+{
+    const struct cred *old = hide_creds_begin();
+    struct file *fp;
+    int err;
+
+    if (!old)
+        return;
+
+    if (enabled) {
+        fp = filp_open(NKSU_FEATURE_FLAG, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (IS_ERR(fp))
+            pr_warn("[selinux_hide] cannot write %s: %ld\n", NKSU_FEATURE_FLAG,
+                    PTR_ERR(fp));
+        else
+            filp_close(fp, NULL);
+    } else {
+        err = kfile_unlink(NKSU_FEATURE_FLAG);
+        if (err && err != -ENOENT)
+            pr_warn("[selinux_hide] cannot remove %s: %d\n", NKSU_FEATURE_FLAG,
+                    err);
+    }
+
+    hide_creds_end(old);
 }
 
 /* Index into selinuxfs's `write_op` table, mirroring sel_inos in selinuxfs.c. */
@@ -584,7 +664,11 @@ static int nksu_hide_feature_get(u64 *value)
     return 0;
 }
 
-static int nksu_hide_feature_set(u64 value)
+/*
+ * Switch the feature.  `persist` is false for the boot-time enable: the flag
+ * file is what asked for it, so rewriting it there would be pointless.
+ */
+static int nksu_hide_apply(u64 value, bool persist)
 {
     int ret = 0;
 
@@ -600,8 +684,14 @@ static int nksu_hide_feature_set(u64 value)
         nksu_hide_running = false;
     }
     mutex_unlock(&nksu_hide_mutex);
+
+    if (!ret && persist)
+        nksu_feature_flag_store(value != 0);
+
     return ret;
 }
+
+static int nksu_hide_feature_set(u64 value) { return nksu_hide_apply(value, true); }
 
 static const struct nksu_feature nksu_hide_feature = {
     .id = NKSU_FEATURE_SELINUX_HIDE,
@@ -623,7 +713,7 @@ int nksu_selinux_hide_init(void)
         return 0;
     }
 
-    ret = nksu_feature_set(NKSU_FEATURE_SELINUX_HIDE, 1);
+    ret = nksu_hide_apply(1, false);
     if (ret)
         pr_warn("[selinux_hide] enable from %s failed: %d\n",
                 NKSU_FEATURE_FLAG, ret);

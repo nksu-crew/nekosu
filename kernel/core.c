@@ -63,11 +63,6 @@ static const module_component_t feature_components[] = {
         .init = nksu_profile_store_init,
         .exit = nksu_profile_store_exit,
     },
-    {
-        .name = "SELinux hide",
-        .init = nksu_selinux_hide_init,
-        .exit = nksu_selinux_hide_exit,
-    },
 #ifndef CONFIG_NKSU_SYSCALL
     {
         .name = "tracepoint hook",
@@ -79,6 +74,15 @@ static const module_component_t feature_components[] = {
         .name = "manager scan",
         .init = appscan_init,
         .exit = appscan_exit,
+    },
+    {
+        /*
+         * After the manager scan: the feature flag is persisted under
+         * /data/adb/nksu, which that component bootstraps.
+         */
+        .name = "SELinux hide",
+        .init = nksu_selinux_hide_init,
+        .exit = nksu_selinux_hide_exit,
     },
 #ifdef CONFIG_NKSU_SYSCALL
     {

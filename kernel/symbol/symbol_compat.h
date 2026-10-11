@@ -88,6 +88,7 @@ extern typeof(security_context_to_sid) *nksu_security_context_to_sid;
  * and lookup_one_len are not part of every GKI export set, so reach them
  * through kallsyms like the rest. */
 extern typeof(vfs_mkdir) *nksu_vfs_mkdir;
+extern typeof(vfs_unlink) *nksu_vfs_unlink;
 extern typeof(lookup_one_len) *nksu_lookup_one_len;
 /* Persist the nksu_file label on the bootstrapped daemon (see selinux.c). */
 extern typeof(__vfs_setxattr_noperm) *nksu___vfs_setxattr_noperm;
@@ -146,6 +147,7 @@ extern typeof(copy_to_kernel_nofault) *nksu_copy_to_kernel_nofault;
 #define hashtab_map                      nksu_hashtab_map
 #define security_context_to_sid          nksu_security_context_to_sid
 #define vfs_mkdir                        nksu_vfs_mkdir
+#define vfs_unlink                       nksu_vfs_unlink
 #define lookup_one_len                   nksu_lookup_one_len
 #define __vfs_setxattr_noperm            nksu___vfs_setxattr_noperm
 #define kernel_thread                    nksu_kernel_thread

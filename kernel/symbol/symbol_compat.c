@@ -42,6 +42,7 @@ typeof(hashtab_map) *nksu_hashtab_map;
 typeof(__hashtab_insert) *nksu___hashtab_insert;
 typeof(security_context_to_sid) *nksu_security_context_to_sid;
 typeof(vfs_mkdir) *nksu_vfs_mkdir;
+typeof(vfs_unlink) *nksu_vfs_unlink;
 typeof(lookup_one_len) *nksu_lookup_one_len;
 typeof(__vfs_setxattr_noperm) *nksu___vfs_setxattr_noperm;
 
@@ -83,6 +84,7 @@ int nksu_symbol_compat_init(void)
 		     "selinux_status_update_policyload");
 	NKSU_RESOLVE(nksu_security_context_to_sid, "security_context_to_sid");
 	NKSU_RESOLVE(nksu_vfs_mkdir, "vfs_mkdir");
+	NKSU_RESOLVE(nksu_vfs_unlink, "vfs_unlink");
 	NKSU_RESOLVE(nksu_lookup_one_len, "lookup_one_len");
 	NKSU_RESOLVE(nksu___vfs_setxattr_noperm, "__vfs_setxattr_noperm");
 	NKSU_RESOLVE(nksu_selinux_state, "selinux_state");
@@ -143,6 +145,7 @@ void nksu_symbol_compat_exit(void)
 	nksu_selinux_status_update_policyload = NULL;
 	nksu_security_context_to_sid = NULL;
 	nksu_vfs_mkdir = NULL;
+	nksu_vfs_unlink = NULL;
 	nksu_lookup_one_len = NULL;
 	nksu___vfs_setxattr_noperm = NULL;
 	nksu_selinux_state = NULL;
