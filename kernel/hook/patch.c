@@ -2,10 +2,20 @@
 /*
  * Write kernel memory through a fixmap alias with the other CPUs stopped.
  *
- * hook/syscall.c carries its own copy of this technique for the syscall table;
- * this one exists so the SELinux hiding feature can redirect the selinuxfs op
- * tables without touching that path.  The names are prefixed so a thin-LTO
- * build never sees two conflicting `struct patch_info` definitions.
+ * Why this is not hook/syscall.c's patcher:
+ *  - That one belongs to the syscall-table hook path.  Its init_mm_ptr and
+ *    sys_call_table come from syscalltable_init(), which is owned by
+ *    nksu_dispatch_init() (dispatch).  In the default tracepoint build that
+ *    only runs on a first-stage load, so on a late load the pointer is NULL;
+ *    and at the zygote stage nksu_dispatch_exit() -> syscalltable_exit()
+ *    unhooks every entry recorded in hook_table, so anything patched through
+ *    it would be reverted right before the feature components run.
+ *  - A feature must therefore own its own patch path and its own init_mm, and
+ *    must not depend on the dispatch/syscalltable lifetime.  Both copies share
+ *    FIX_TEXT_POKE0, but stop_machine() serialises them.
+ *
+ * The names are prefixed so a thin-LTO build never sees two conflicting
+ * `struct patch_info` definitions.
  */
 #include <linux/kallsyms.h>
 #include <linux/mm.h>

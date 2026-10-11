@@ -17,15 +17,76 @@
  * that by vendoring the policy engine; that has not been ported here, so on
  * 6.6+ the feature reports itself as unavailable.
  */
+#include <linux/capability.h>
+#include <linux/cred.h>
+#include <linux/err.h>
+#include <linux/fs.h>
+#include <linux/printk.h>
 #include <linux/types.h>
 #include <linux/version.h>
 
 #include "manager/feature.h"
-#include "manager/manager.h"
 #include "selinux/hide.h"
+#include "selinux/selinux.h"
 
 /* Its presence at boot turns the feature on. */
 #define NKSU_FEATURE_FLAG "/data/adb/nksu/feature"
+
+/*
+ * The flag lives under /data/adb, which only the nksu domain can reach.  Like
+ * profile_store, borrow a cred switched to that domain for the lookup; the
+ * feature-init stage (zygote) is already after /data is mounted.  Own cred,
+ * not the manager scan's.
+ */
+static struct cred *hide_cred;
+
+static const struct cred *hide_creds_begin(void)
+{
+    if (!hide_cred) {
+        struct cred *cred = prepare_creds();
+
+        if (!cred)
+            return NULL;
+
+        cred->cap_effective = CAP_FULL_SET;
+        cred->cap_permitted = CAP_FULL_SET;
+        cred->cap_bset = CAP_FULL_SET;
+        cred->cap_inheritable = CAP_FULL_SET;
+
+        if (set_domain(DOMAIN_CTX, cred)) {
+            abort_creds(cred);
+            return NULL;
+        }
+        hide_cred = cred;
+    }
+
+    return override_creds(hide_cred);
+}
+
+static void hide_creds_end(const struct cred *old)
+{
+    if (old)
+        revert_creds(old);
+}
+
+static bool nksu_feature_flag_present(void)
+{
+    const struct cred *old;
+    struct file *fp;
+    bool present;
+
+    old = hide_creds_begin();
+    if (!old)
+        return false;
+
+    fp = filp_open(NKSU_FEATURE_FLAG, O_RDONLY, 0);
+    present = !IS_ERR(fp);
+    if (!IS_ERR(fp))
+        filp_close(fp, NULL);
+
+    hide_creds_end(old);
+    return present;
+}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
 
@@ -399,7 +460,7 @@ int nksu_selinux_hide_init(void)
     if (ret)
         pr_warn("[selinux_hide] feature register failed: %d\n", ret);
 
-    if (!nksu_file_exists(NKSU_FEATURE_FLAG)) {
+    if (!nksu_feature_flag_present()) {
         pr_info("[selinux_hide] %s absent, off\n", NKSU_FEATURE_FLAG);
         return 0;
     }
@@ -427,4 +488,9 @@ void nksu_selinux_hide_exit(void)
     }
     mutex_unlock(&selinux_state.status_lock);
 #endif
+
+    if (hide_cred) {
+        put_cred(hide_cred);
+        hide_cred = NULL;
+    }
 }
