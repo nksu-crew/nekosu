@@ -15,6 +15,9 @@
 #include <linux/kthread.h>
 #include <linux/wait.h>
 #include <linux/delay.h>
+#include <linux/jiffies.h>
+#include <linux/atomic.h>
+#include <linux/fsnotify_backend.h>
 #include <linux/cred.h>
 #include <linux/capability.h>
 #include <fmac.h>
@@ -921,21 +924,150 @@ out:
 
 static struct task_struct *appscan_thread;
 static DECLARE_WAIT_QUEUE_HEAD(appscan_wq);
+static atomic_t appscan_pending = ATOMIC_INIT(0);
+
+/*
+ * packages.xml observer.
+ *
+ * PackageManagerService republishes /data/system/packages.xml whenever the set
+ * of installed packages changes (it writes a reserve copy and renames it into
+ * place), so watch the directory and re-run the manager scan as soon as the
+ * manager appears or is updated. The callback runs under the fsnotify SRCU lock
+ * and must not sleep, so it only flags the scan thread.
+ */
+#define APPSCAN_WATCH_DIR "/data/system"
+#define APPSCAN_WATCH_NAME "packages.xml"
+#define APPSCAN_WATCH_MASK (FS_CREATE | FS_MOVE | FS_EVENT_ON_CHILD)
+
+static struct fsnotify_group *appscan_group;
+static struct fsnotify_mark *appscan_mark;
+
+static void appscan_notify(void)
+{
+    atomic_set(&appscan_pending, 1);
+    wake_up_interruptible(&appscan_wq);
+}
+
+static int appscan_handle_inode_event(struct fsnotify_mark *mark, u32 mask,
+                                      struct inode *inode, struct inode *dir,
+                                      const struct qstr *file_name, u32 cookie)
+{
+    (void)mark;
+    (void)mask;
+    (void)inode;
+    (void)dir;
+    (void)cookie;
+
+    if (!file_name || file_name->len != sizeof(APPSCAN_WATCH_NAME) - 1)
+        return 0;
+    if (memcmp(file_name->name, APPSCAN_WATCH_NAME,
+               sizeof(APPSCAN_WATCH_NAME) - 1))
+        return 0;
+
+    appscan_notify();
+    return 0;
+}
+
+static const struct fsnotify_ops appscan_ops = {
+    .handle_inode_event = appscan_handle_inode_event,
+};
+
+static void appscan_observer_exit(void)
+{
+    if (appscan_mark) {
+        fsnotify_destroy_mark(appscan_mark, appscan_group);
+        fsnotify_put_mark(appscan_mark);
+        appscan_mark = NULL;
+    }
+    if (appscan_group) {
+        fsnotify_put_group(appscan_group);
+        appscan_group = NULL;
+    }
+}
+
+static int appscan_observer_init(void)
+{
+    const struct cred *old;
+    struct fsnotify_mark *mark;
+    struct path kpath;
+    int ret;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+    appscan_group = fsnotify_alloc_group(&appscan_ops, 0);
+#else
+    appscan_group = fsnotify_alloc_group(&appscan_ops);
+#endif
+    if (IS_ERR(appscan_group)) {
+        ret = PTR_ERR(appscan_group);
+        appscan_group = NULL;
+        return ret;
+    }
+
+    /* /data/system is only reachable under nksu's domain + full caps. */
+    old = nksu_scan_creds_begin();
+    ret = kern_path(APPSCAN_WATCH_DIR, LOOKUP_FOLLOW, &kpath);
+    nksu_scan_creds_end(old);
+    if (ret)
+        goto out_group;
+
+    mark = kzalloc(sizeof(*mark), GFP_KERNEL);
+    if (!mark) {
+        ret = -ENOMEM;
+        path_put(&kpath);
+        goto out_group;
+    }
+
+    fsnotify_init_mark(mark, appscan_group);
+    mark->mask = APPSCAN_WATCH_MASK;
+    ret = fsnotify_add_inode_mark(mark, d_inode(kpath.dentry), 0);
+    path_put(&kpath);
+    if (ret) {
+        fsnotify_put_mark(mark);
+        goto out_group;
+    }
+
+    appscan_mark = mark;
+    pr_info("[manager] watching %s/%s\n", APPSCAN_WATCH_DIR, APPSCAN_WATCH_NAME);
+    return 0;
+
+out_group:
+    pr_warn("[manager] package observer unavailable (%d)\n", ret);
+    fsnotify_put_group(appscan_group);
+    appscan_group = NULL;
+    return ret;
+}
 
 static int appscan_retry_thread(void *data)
 {
-    int tries = 120; /* up to ~60s */
+    int tries = 120; /* first boot: up to ~60s of retries */
 
     while (!kthread_should_stop()) {
         if (scan_and_apply() == 0) {
             pr_info("[manager] manager profile applied\n");
-            break;
+            tries = 0; /* applied: park until packages.xml changes */
+        } else if (tries > 0 && --tries == 0) {
+            pr_info("[manager] manager not found yet, waiting for package changes\n");
         }
-        if (--tries <= 0) {
-            pr_err("[manager] manager package not found, giving up\n");
-            break;
+
+        if (tries > 0) {
+            /*
+             * First boot: retry every 500ms, but wake up immediately when
+             * packages.xml changes.
+             */
+            wait_event_interruptible_timeout(appscan_wq,
+                                             kthread_should_stop() ||
+                                                 atomic_xchg(&appscan_pending, 0),
+                                             msecs_to_jiffies(500));
+        } else {
+            /*
+             * Applied, or out of retries: wait for the app list to change and
+             * then re-run the scan, so the manager is picked up without a
+             * reboot.
+             */
+            wait_event_interruptible(appscan_wq,
+                                     kthread_should_stop() ||
+                                         atomic_xchg(&appscan_pending, 0));
         }
-        msleep(500);
     }
 
     /*
@@ -949,20 +1081,23 @@ static int appscan_retry_thread(void *data)
 
 int appscan_init(void)
 {
+    int ret;
+
     pr_info("[manager] Module starting scan...\n");
 
-    if (scan_and_apply() == 0)
-        return 0;
+    appscan_observer_init();
 
     /*
-     * A first-stage (vendor_boot) load starts the feature components at the
-     * zygote, before PackageManagerService has (re)written the package list,
-     * so keep retrying in the background.
+     * Always keep the scan thread around: the packages.xml observer wakes it
+     * whenever the app list changes. A first-stage (vendor_boot) load starts
+     * before PackageManagerService has written the package list, so the first
+     * successful scan usually comes from the retry loop.
      */
     appscan_thread = kthread_run(appscan_retry_thread, NULL, "nksu-appscan");
     if (IS_ERR(appscan_thread)) {
-        int ret = PTR_ERR(appscan_thread);
+        ret = PTR_ERR(appscan_thread);
         appscan_thread = NULL;
+        appscan_observer_exit();
         return ret;
     }
     return 0;
@@ -974,6 +1109,7 @@ void appscan_exit(void)
         kthread_stop(appscan_thread);
         appscan_thread = NULL;
     }
+    appscan_observer_exit();
     if (nksu_scan_cred) {
         put_cred(nksu_scan_cred);
         nksu_scan_cred = NULL;
