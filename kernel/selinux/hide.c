@@ -46,7 +46,7 @@
 #include "avc.h"
 #include "objsec.h"
 
-#include "hook/syscall.h"
+#include "hook/patch.h"
 #include "selinux/policy.h"
 #include "symbol/symbol.h"
 

@@ -76,8 +76,7 @@ fail:
 
 struct patch_info {
     void *dst;
-    const void *newval;
-    size_t size;
+    syscall_fn_t newval;
     atomic_t cpu_count;
     int result;
 };
@@ -96,7 +95,7 @@ static __nocfi int do_patch_nosync(struct patch_info *p)
     }
 
     map = (void *)set_fixmap_offset(FIX_TEXT_POKE0, phy);
-    err = (int)copy_to_kernel_nofault(map, p->newval, p->size);
+    err = (int)copy_to_kernel_nofault(map, &p->newval, sizeof(syscall_fn_t));
     clear_fixmap(FIX_TEXT_POKE0);
 
     if (!err) {
@@ -121,36 +120,16 @@ static int patch_text_cb(void *arg)
     return 0;
 }
 
-int nksu_patch_text(void *slot, const void *newval, size_t size)
+static int patch_syscall_slot(void *addr, syscall_fn_t newval)
 {
     struct patch_info p = {
-        .dst = slot,
+        .dst = addr,
         .newval = newval,
-        .size = size,
         .cpu_count = ATOMIC_INIT(0),
         .result = 0,
     };
-    int ret;
-
-    /*
-     * phys_from_virt() walks init_mm.  syscalltable_init() sets it for the
-     * syscall-table hook, but the tracepoint build never calls that, so
-     * resolve it here too.
-     */
-    if (!init_mm_ptr)
-        init_mm_ptr = (struct mm_struct *)nksu_ksym_lookup("init_mm");
-    if (!init_mm_ptr) {
-        pr_err("nksu: init_mm unavailable for text patch\n");
-        return -ENOENT;
-    }
-
-    ret = stop_machine(patch_text_cb, &p, cpu_online_mask);
+    int ret = stop_machine(patch_text_cb, &p, cpu_online_mask);
     return ret ? ret : p.result;
-}
-
-static int patch_syscall_slot(void *addr, syscall_fn_t newval)
-{
-    return nksu_patch_text(addr, &newval, sizeof(newval));
 }
 
 static int syscalltable_hook(unsigned long addr, syscall_fn_t hook_fn)
