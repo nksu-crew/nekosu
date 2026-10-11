@@ -142,23 +142,23 @@ int nksu_lsm_hook(struct nksu_lsm_hook *hook)
 		for (i = 0; i < scalls_count; i++) {
 			struct lsm_static_call *scall = &scalls[i];
 			void **slot;
-			void *current;
+			void *cur;
 
 			entry = READ_ONCE(scall->hl);
 			if (!entry)
 				continue;
 			slot = (void **)((char *)entry + hook->hook_offset);
-			current = READ_ONCE(*slot);
-			if (current == hook->replacement) {
+			cur = READ_ONCE(*slot);
+			if (cur == hook->replacement) {
 				ret = -EALREADY;
 				goto out_unlock;
 			}
-			if (current != target)
+			if (cur != target)
 				continue;
 			selected_entry = entry;
 			selected_scall = scall;
 			selected_slot = slot;
-			selected_origin = current;
+			selected_origin = cur;
 			break;
 		}
 
@@ -214,16 +214,16 @@ int nksu_lsm_hook(struct nksu_lsm_hook *hook)
 			hlist_for_each_entry(entry, head, list) {
 				void **slot = (void **)((char *)entry +
 							hook->hook_offset);
-				void *current = READ_ONCE(*slot);
+				void *cur = READ_ONCE(*slot);
 
-				if (current == hook->replacement) {
+				if (cur == hook->replacement) {
 					ret = -EALREADY;
 					goto out_unlock;
 				}
-				if (current == target) {
+				if (cur == target) {
 					selected_entry = entry;
 					selected_slot = slot;
-					selected_origin = current;
+					selected_origin = cur;
 					break;
 				}
 			}
