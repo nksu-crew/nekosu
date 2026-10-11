@@ -94,7 +94,8 @@ int nksu_lsm_hook(struct nksu_lsm_hook *hook)
 		goto out_unlock;
 	}
 
-	lookup_size = (void *)nksu_ksym_lookup("kallsyms_lookup_size_offset");
+	lookup_size = (typeof(lookup_size))
+		nksu_ksym_lookup("kallsyms_lookup_size_offset");
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 	{
